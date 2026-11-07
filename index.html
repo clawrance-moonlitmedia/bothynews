@@ -706,11 +706,20 @@
         }
 
         function getElectorateColor(electorateName) {
-            const cleanKey = normalizeName(electorateName);
-            let item = electionData[electorateName] || normalizedData[cleanKey];
+            if (!electorateName) return "#27272a";
             
+            const cleanTarget = normalizeName(electorateName);
+            
+            // 1. Try exact match or direct normalized match
+            let item = electionData[electorateName] || normalizedData[cleanTarget];
+            
+            // 2. Fallback: fuzzy search through all backend keys by stripping all spaces, hyphens, and macrons
             if (!item) {
-                const foundKey = Object.keys(electionData).find(k => normalizeName(k) === cleanKey);
+                const foundKey = Object.keys(electionData).find(k => {
+                    const cleanKey = normalizeName(k).replace(/[\s-]+/g, '');
+                    const targetStripped = cleanTarget.replace(/[\s-]+/g, '');
+                    return cleanKey === targetStripped;
+                });
                 if (foundKey) item = electionData[foundKey];
             }
 
@@ -719,11 +728,17 @@
         }
 
         function updateLayerTooltipAndStyle(layer, name) {
-            const cleanKey = normalizeName(name);
-            let item = electionData[name] || normalizedData[cleanKey];
+            if (!name) return;
+            
+            const cleanTarget = normalizeName(name);
+            let item = electionData[name] || normalizedData[cleanTarget];
             
             if (!item) {
-                const foundKey = Object.keys(electionData).find(k => normalizeName(k) === cleanKey);
+                const foundKey = Object.keys(electionData).find(k => {
+                    const cleanKey = normalizeName(k).replace(/[\s-]+/g, '');
+                    const targetStripped = cleanTarget.replace(/[\s-]+/g, '');
+                    return cleanKey === targetStripped;
+                });
                 if (foundKey) item = electionData[foundKey];
             }
 
