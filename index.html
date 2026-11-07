@@ -686,7 +686,6 @@
             flex-shrink: 0;
         }
 
-        /* Government Majority Progress Card */
         .gov-progress-card {
             background-color: #18181b;
             border: 1px solid var(--border-color);
@@ -694,7 +693,18 @@
             padding: 12px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px; /* Increased gap to make room */
+        }
+        
+        .bloc-bars {
+            display: flex;
+            height: 24px;
+            border-radius: 4px;
+            overflow: visible; /* Changed from hidden to visible */
+            background-color: #27272a;
+            position: relative;
+            border: 1px solid #3f3f46;
+            margin-top: 16px; /* Space above for the floating labels */
         }
 
         .gov-progress-title {
@@ -710,16 +720,6 @@
         .gov-progress-target {
             color: #f59e0b;
             font-family: var(--font-mono);
-        }
-
-        .bloc-bars {
-            display: flex;
-            height: 22px;
-            border-radius: 4px;
-            overflow: hidden;
-            background-color: #27272a;
-            position: relative;
-            border: 1px solid #3f3f46;
         }
 
         .bloc-bar-segment {
@@ -1449,8 +1449,8 @@
             rightHtml += `</div>`;
 
             progressBar.innerHTML = `
-                <div style="position: absolute; top: -18px; left: 8px; font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700; color: #f87171;">Left: ${leftSeats}</div>
-                <div style="position: absolute; top: -18px; right: 8px; font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700; color: #60a5fa;">Right: ${rightSeats}</div>
+                <div style="position: absolute; top: -22px; left: 0px; font-size: 0.7rem; font-family: var(--font-mono); font-weight: 700; color: #f87171;">Left: ${leftSeats}</div>
+                <div style="position: absolute; top: -22px; right: 0px; font-size: 0.7rem; font-family: var(--font-mono); font-weight: 700; color: #60a5fa;">Right: ${rightSeats}</div>
                 <div class="majority-line" style="left: ${majorityPct}%;"></div>
                 <div class="majority-tooltip" style="left: ${majorityPct}%;">${majorityThreshold}</div>
                 ${leftHtml}
