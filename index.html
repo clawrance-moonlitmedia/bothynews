@@ -65,6 +65,22 @@
             gap: 10px;
         }
 
+        .seat-section-header {
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+            padding: 8px 14px 4px 14px;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        
+        /* Ensure dropdown expands tall enough for list candidates */
+        .party-card-wrapper.expanded .seat-dropdown {
+            max-height: 250px;
+            border-top: 1px solid var(--border-color);
+        }
+
         .brand h1 {
             font-size: 1.15rem;
             font-weight: 800;
@@ -822,157 +838,198 @@
         }
 
         function updateLeaderboard() {
-            const partySeatsMap = {};
-            let leftSeats = 0;
-            let rightSeats = 0;
-            let centerSeats = 0;
+    // 1. Compile Electorate Wins (All 71+ seats)
+    const electorateWinsMap = {};
+    Object.keys(PARTIES).forEach(p => { electorateWinsMap[p] = []; });
 
-            Object.keys(PARTIES).forEach(p => {
-                partySeatsMap[p] = [];
-            });
+    Object.keys(electionData).forEach(electorate => {
+        const item = electionData[electorate];
+        const party = item.leadingParty || "Undeclared";
+        if (electorateWinsMap[party]) {
+            electorateWinsMap[party].push(electorate);
+        }
+    });
 
-            Object.keys(electionData).forEach(electorate => {
-                if (isCurrentRollElectorate(electorate)) {
-                    const item = electionData[electorate];
-                    const party = item.leadingParty || "Undeclared";
-                    
-                    if (partySeatsMap[party]) {
-                        partySeatsMap[party].push(electorate);
-                    }
+    // 2. Compute Proportional Entitlements (Sainte-Laguë out of 120 base seats)
+    const totalPartyVotes = Object.values(partyVoteData).reduce((acc, cur) => acc + (cur.votes || 0), 0);
+    const partyTotalSeats = {};
+    const partyListSeats = {};
+    const partyOverhang = {};
 
-                    if (PARTIES[party]) {
-                        if (PARTIES[party].bloc === "left") leftSeats++;
-                        if (PARTIES[party].bloc === "right") rightSeats++;
-                        if (PARTIES[party].bloc === "center") centerSeats++;
-                    }
-                }
-            });
+    Object.keys(PARTIES).forEach(party => {
+        const pVotes = partyVoteData[party] ? partyVoteData[party].votes : 0;
+        let entitlement = 0;
+        if (totalPartyVotes > 0) {
+            entitlement = Math.round((pVotes / totalPartyVotes) * 120);
+        }
+        const wonCount = (electorateWinsMap[party] || []).length;
+        
+        // If local wins exceed proportional entitlement, overhang occurs
+        const overhang = Math.max(0, wonCount - entitlement);
+        const listSeatsCount = Math.max(0, entitlement - wonCount);
+        
+        partyTotalSeats[party] = wonCount + listSeatsCount;
+        partyListSeats[party] = listSeatsCount;
+        partyOverhang[party] = overhang;
+    });
 
-            const progressBar = document.getElementById('bloc-progress-bar');
-            
-            let leftHtml = `<div class="bloc-left-container">`;
-            Object.keys(PARTIES).forEach(party => {
-                if (PARTIES[party].bloc === "left") {
-                    const count = (partySeatsMap[party] || []).length;
-                    if (count > 0) {
-                        const pct = (count / 120) * 100;
-                        leftHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
-                    }
-                }
-            });
-            leftHtml += `</div>`;
+    // 3. Calculate Bloc Totals for Progress Bar
+    let leftSeats = 0;
+    let rightSeats = 0;
+    let centerSeats = 0;
 
-            let centerHtml = `<div style="display: flex; height: 100%;">`;
-            Object.keys(PARTIES).forEach(party => {
-                if (PARTIES[party].bloc === "center") {
-                    const count = (partySeatsMap[party] || []).length;
-                    if (count > 0) {
-                        const pct = (count / 120) * 100;
-                        centerHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
-                    }
-                }
-            });
-            centerHtml += `</div>`;
+    Object.keys(PARTIES).forEach(party => {
+        const total = partyTotalSeats[party] || 0;
+        if (PARTIES[party].bloc === "left") leftSeats += total;
+        if (PARTIES[party].bloc === "right") rightSeats += total;
+        if (PARTIES[party].bloc === "center") centerSeats += total;
+    });
 
-            let rightHtml = `<div class="bloc-right-container">`;
-            Object.keys(PARTIES).forEach(party => {
-                if (PARTIES[party].bloc === "right") {
-                    const count = (partySeatsMap[party] || []).length;
-                    if (count > 0) {
-                        const pct = (count / 120) * 100;
-                        rightHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
-                    }
-                }
-            });
-            rightHtml += `</div>`;
-
-            progressBar.innerHTML = `
-                <div class="majority-line"></div>
-                <div class="majority-tooltip">61</div>
-                ${leftHtml}
-                ${centerHtml}
-                ${rightHtml}
-            `;
-
-            const scenarioBox = document.getElementById('scenario-box');
-            if (leftSeats < 61 && rightSeats < 61 && (leftSeats + centerSeats >= 61 || rightSeats + centerSeats >= 61)) {
-                scenarioBox.style.display = "flex";
-            } else {
-                scenarioBox.style.display = "none";
+    const progressBar = document.getElementById('bloc-progress-bar');
+    
+    let leftHtml = `<div class="bloc-left-container">`;
+    Object.keys(PARTIES).forEach(party => {
+        if (PARTIES[party].bloc === "left") {
+            const count = partyTotalSeats[party] || 0;
+            if (count > 0) {
+                const pct = (count / 120) * 100;
+                leftHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
             }
+        }
+    });
+    leftHtml += `</div>`;
 
-            const container = document.getElementById('party-leaderboard');
-            container.innerHTML = '';
+    let centerHtml = `<div style="display: flex; height: 100%;">`;
+    Object.keys(PARTIES).forEach(party => {
+        if (PARTIES[party].bloc === "center") {
+            const count = partyTotalSeats[party] || 0;
+            if (count > 0) {
+                const pct = (count / 120) * 100;
+                centerHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+            }
+        }
+    });
+    centerHtml += `</div>`;
 
+    let rightHtml = `<div class="bloc-right-container">`;
+    Object.keys(PARTIES).forEach(party => {
+        if (PARTIES[party].bloc === "right") {
+            const count = partyTotalSeats[party] || 0;
+            if (count > 0) {
+                const pct = (count / 120) * 100;
+                rightHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+            }
+        }
+    });
+    rightHtml += `</div>`;
+
+    progressBar.innerHTML = `
+        <div class="majority-line"></div>
+        <div class="majority-tooltip">61</div>
+        ${leftHtml}
+        ${centerHtml}
+        ${rightHtml}
+    `;
+
+    const scenarioBox = document.getElementById('scenario-box');
+    if (leftSeats < 61 && rightSeats < 61 && (leftSeats + rightSeats) < 120) {
+        scenarioBox.style.display = 'flex';
+    } else {
+        scenarioBox.style.display = 'none';
+    }
+
+    // 4. Render Party Leaderboard Cards with Dropdown Menu (Electorate + List + Overhang)
+    const leaderboardContainer = document.getElementById('party-leaderboard');
+            leaderboardContainer.innerHTML = '';
+        
             const sortedParties = Object.keys(PARTIES).sort((a, b) => {
-                const seatsA = (partySeatsMap[a] || []).length;
-                const seatsB = (partySeatsMap[b] || []).length;
+                const seatsA = partyTotalSeats[a] || 0;
+                const seatsB = partyTotalSeats[b] || 0;
                 if (seatsB !== seatsA) return seatsB - seatsA;
-
-                const votesA = (partyVoteData[a] ? partyVoteData[a].percent : 0);
-                const votesB = (partyVoteData[b] ? partyVoteData[b].percent : 0);
-                return votesB - votesA;
+                const pctA = partyVoteData[a] ? partyVoteData[a].percent : 0;
+                const pctB = partyVoteData[b] ? partyVoteData[b].percent : 0;
+                return pctB - pctA;
             });
-
+        
             sortedParties.forEach(party => {
-                const seatsList = partySeatsMap[party] || [];
-                const seatCount = seatsList.length;
-                seatsList.sort();
-
-                const partyMeta = PARTIES[party];
-                const pv = partyVoteData[party] || { votes: 0, percent: 0.0 };
-
+                const totalSeats = partyTotalSeats[party] || 0;
+                if (totalSeats === 0 && (!partyVoteData[party] || partyVoteData[party].votes === 0)) {
+                    return;
+                }
+        
+                const wonElectorates = electorateWinsMap[party] || [];
+                const listCount = partyListSeats[party] || 0;
+                const overhangCount = partyOverhang[party] || 0;
+                const pData = partyVoteData[party] || { votes: 0, percent: 0.0 };
+                const badgeType = PARTIES[party].badge.toLowerCase();
+        
                 const wrapper = document.createElement('div');
                 wrapper.className = 'party-card-wrapper';
-
-                const card = document.createElement('div');
-                card.className = 'party-card';
-                card.style.borderLeftColor = partyMeta.color;
-                card.onclick = () => togglePartyAccordion(wrapper);
-
-                const votesFormatted = (pv.votes || 0).toLocaleString();
-                const percentFormatted = (pv.percent || 0.0).toFixed(1);
-
-                card.innerHTML = `
-                    <div class="party-info">
-                        <div class="party-title-row">
-                            <span class="party-name">${party}</span>
-                            <span class="party-badge badge-${partyMeta.bloc}">${partyMeta.badge}</span>
-                        </div>
-                        <div class="party-votes-sub">
-                            ${percentFormatted}% &bull; ${votesFormatted} votes
-                        </div>
-                    </div>
-                    <div class="party-stats-right">
-                        <span class="party-seats-val" style="color: ${seatCount > 0 ? partyMeta.color : '#71717a'}">${seatCount}</span>
-                        <span class="party-seats-label">seats</span>
-                    </div>
-                `;
-                wrapper.appendChild(card);
-
-                const dropdown = document.createElement('div');
-                dropdown.className = 'seat-dropdown';
-
-                if (seatCount > 0) {
-                    seatsList.forEach(seat => {
-                        const seatItem = document.createElement('div');
-                        seatItem.className = 'seat-item';
-                        seatItem.innerText = seat;
-                        seatItem.onclick = (e) => {
-                            e.stopPropagation();
-                            zoomToSeat(seat);
-                        };
-                        dropdown.appendChild(seatItem);
+        
+                let dropdownContent = '';
+                
+                // Electorate Section
+                dropdownContent += `<div class="seat-section-header">Electorate Seats Won (${wonElectorates.length})</div>`;
+                if (wonElectorates.length > 0) {
+                    wonElectorates.forEach(seat => {
+                        dropdownContent += `
+                            <div class="seat-item" onclick="zoomToSeat('${seat}')">
+                                <span>📍 ${seat}</span>
+                                <span style="font-family: var(--font-mono); font-size: 0.7rem;">Electorate</span>
+                            </div>
+                        `;
                     });
                 } else {
-                    const emptyNotice = document.createElement('div');
-                    emptyNotice.className = 'seat-item empty-notice';
-                    emptyNotice.innerText = 'No electorate seats won';
-                    dropdown.appendChild(emptyNotice);
+                    dropdownContent += `<div class="seat-item empty-notice">No local electorate seats won</div>`;
                 }
-
-                wrapper.appendChild(dropdown);
-                container.appendChild(wrapper);
+        
+                // List Seats Section
+                dropdownContent += `<div class="seat-section-header">Party List Seats (${listCount})</div>`;
+                if (listCount > 0) {
+                    for (let i = 1; i <= listCount; i++) {
+                        dropdownContent += `
+                            <div class="seat-item" style="cursor: default;">
+                                <span>📋 List Candidate #${i}</span>
+                                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #60a5fa;">Proportional</span>
+                            </div>
+                        `;
+                    }
+                } else {
+                    dropdownContent += `<div class="seat-item empty-notice">No list seats allocated</div>`;
+                }
+        
+                // Overhang Section if applicable
+                if (overhangCount > 0) {
+                    dropdownContent += `<div class="seat-section-header" style="color: #f59e0b;">Overhang Seats (${overhangCount})</div>`;
+                    dropdownContent += `
+                        <div class="seat-item empty-notice" style="color: #fbbf24;">
+                            ⚠️ ${overhangCount} extra electorate seat(s) won beyond vote share entitlement.
+                        </div>
+                    `;
+                }
+        
+                wrapper.innerHTML = `
+                    <div class="party-card" style="border-left-color: ${PARTIES[party].color};" onclick="togglePartyAccordion(this.parentElement)">
+                        <div class="party-info">
+                            <div class="party-title-row">
+                                <span class="party-name">${party}</span>
+                                <span class="party-badge badge-${badgeType}">${PARTIES[party].badge}</span>
+                            </div>
+                            <div class="party-votes-sub">
+                                ${pData.percent.toFixed(2)}% party vote (${pData.votes.toLocaleString()} votes)
+                            </div>
+                        </div>
+                        <div class="party-stats-right">
+                            <span class="party-seats-val" style="color: ${PARTIES[party].color};">${totalSeats}</span>
+                            <span class="party-seats-label">Seats</span>
+                        </div>
+                    </div>
+                    <div class="seat-dropdown">
+                        ${dropdownContent}
+                    </div>
+                `;
+        
+                leaderboardContainer.appendChild(wrapper);
             });
         }
 
