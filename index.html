@@ -897,7 +897,15 @@
             });
         }
 
-        window.onload = initMap;
+        window.onload = async () => {
+            await initMap();
+            
+            // Automatically re-fetch data every 60 seconds (60,000 ms)
+            setInterval(async () => {
+                await fetchData();
+                updateLeaderboard();
+            }, 60000);
+        };
     </script>
 </body>
 </html>
