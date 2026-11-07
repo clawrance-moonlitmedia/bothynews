@@ -709,7 +709,6 @@
             const cleanKey = normalizeName(electorateName);
             let item = electionData[electorateName] || normalizedData[cleanKey];
             
-            // Fallback: search keys case/macron-insensitively if direct match fails
             if (!item) {
                 const foundKey = Object.keys(electionData).find(k => normalizeName(k) === cleanKey);
                 if (foundKey) item = electionData[foundKey];
@@ -753,28 +752,6 @@
                 candidatesHtml += '</div>';
             }
 
-            let tooltipContent = `
-                <div style="font-family: var(--font-main);">
-                    <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #27272a; padding-bottom: 4px; margin-bottom: 4px;">
-                        <strong style="font-size: 0.88rem; color: #ffffff;">${name}</strong>
-                        ${statusBadge}
-                    </div>
-                    <div style="font-size: 0.75rem; color: #60a5fa; font-weight: 600; margin-bottom: 2px;">
-                        Leading: ${party}
-                    </div>
-                    ${candidatesHtml}
-                </div>
-            `;
-
-            if (layer.getTooltip()) {
-                layer.setTooltipContent(tooltipContent);
-            } else {
-                layer.bindTooltip(tooltipContent, {
-                    sticky: true,
-                    className: 'leaflet-tooltip-custom'
-                });
-            }
-        }
             let tooltipContent = `
                 <div style="font-family: var(--font-main);">
                     <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #27272a; padding-bottom: 4px; margin-bottom: 4px;">
