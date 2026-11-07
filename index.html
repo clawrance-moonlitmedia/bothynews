@@ -897,7 +897,7 @@
 
             const progressBar = document.getElementById('bloc-progress-bar');
             
-            let leftHtml = `<div class="bloc-left-container">`;
+            let leftHtml = `<div class="bloc-left-container" title="Left Bloc: ${leftSeats} seats">`;
             Object.keys(PARTIES).forEach(party => {
                 if (PARTIES[party].bloc === "left") {
                     const count = partyTotalSeats[party] || 0;
@@ -921,7 +921,7 @@
             });
             centerHtml += `</div>`;
 
-            let rightHtml = `<div class="bloc-right-container">`;
+            let rightHtml = `<div class="bloc-right-container" title="Right Bloc: ${rightSeats} seats">`;
             Object.keys(PARTIES).forEach(party => {
                 if (PARTIES[party].bloc === "right") {
                     const count = partyTotalSeats[party] || 0;
@@ -941,7 +941,7 @@
                 ${rightHtml}
             `;
 
-            document.querySelector('.gov-progress-target').innerText = `Majority: ${majorityThreshold} Seats`;
+            document.querySelector('.gov-progress-target').innerText = `Majority: ${majorityThreshold} Seats (${totalParliamentSeats} Total)`;
 
             const scenarioBox = document.getElementById('scenario-box');
             if (leftSeats < majorityThreshold && rightSeats < majorityThreshold && (leftSeats + rightSeats) < totalParliamentSeats) {
