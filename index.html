@@ -405,16 +405,11 @@
             border: 1px solid var(--border-color);
             color: var(--text-light);
             font-family: var(--font-main);
-            font-size: 0.8rem;
-            font-weight: 600;
-            padding: 6px 10px;
+            font-size: 0.78rem;
+            padding: 10px 12px;
             border-radius: 6px;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
-        }
-
-        .leaflet-tooltip-custom strong {
-            font-size: 0.9rem;
-            color: #ffffff;
+            min-width: 210px;
         }
 
         /* Mobile Responsive Breakpoint */
@@ -625,11 +620,9 @@
 
                     Object.keys(electorateList).forEach(key => {
                         const item = electorateList[key];
-                        const rawParty = (typeof item === 'object') ? item.leadingParty : item;
-                        const party = standardizePartyName(rawParty);
-
-                        electionData[key] = party;
-                        normalizedData[normalizeName(key)] = party;
+                        // Store the full electorate object (leadingParty + candidates list)
+                        electionData[key] = item;
+                        normalizedData[normalizeName(key)] = item;
                     });
                 }
             } catch (err) {
@@ -638,11 +631,11 @@
         }
 
         function getElectorateColor(electorateName) {
-            let party = electionData[electorateName];
-            if (!party) {
-                party = normalizedData[normalizeName(electorateName)];
+            let item = electionData[electorateName];
+            if (!item) {
+                item = normalizedData[normalizeName(electorateName)];
             }
-            party = party || "Undeclared";
+            const party = (item && item.leadingParty) ? item.leadingParty : "Undeclared";
             return (PARTIES[party] ? PARTIES[party].color : "#27272a");
         }
 
@@ -682,9 +675,35 @@
                             electorateLayers[name] = layer;
                         }
 
-                        let party = electionData[name] || normalizedData[normalizeName(name)] || "Awaiting Results";
+                        let item = electionData[name] || normalizedData[normalizeName(name)] || { leadingParty: "Awaiting Results", candidates: [] };
+                        const party = item.leadingParty || "Awaiting Results";
                         
-                        layer.bindTooltip(`<strong>${name}</strong><br/>${party}`, {
+                        // Build candidate vote list for hover tooltip
+                        let candidatesHtml = '';
+                        if (item.candidates && item.candidates.length > 0) {
+                            candidatesHtml = '<div style="margin-top: 6px; border-top: 1px solid #27272a; padding-top: 6px; display: flex; flex-direction: column; gap: 3px;">';
+                            item.candidates.forEach(c => {
+                                candidatesHtml += `
+                                    <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 0.72rem;">
+                                        <span style="color: #d4d4d8;"><b>${c.name}</b> (${c.party})</span>
+                                        <span style="font-family: var(--font-mono); color: #a1a1aa;">${c.votes.toLocaleString()}</span>
+                                    </div>
+                                `;
+                            });
+                            candidatesHtml += '</div>';
+                        }
+
+                        let tooltipContent = `
+                            <div style="font-family: var(--font-main);">
+                                <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #27272a; padding-bottom: 4px; margin-bottom: 4px;">
+                                    <strong style="font-size: 0.88rem; color: #ffffff;">${name}</strong>
+                                    <span style="font-size: 0.7rem; color: #60a5fa; font-weight: 700;">${party}</span>
+                                </div>
+                                ${candidatesHtml}
+                            </div>
+                        `;
+
+                        layer.bindTooltip(tooltipContent, {
                             sticky: true,
                             className: 'leaflet-tooltip-custom'
                         });
@@ -747,14 +766,15 @@
             let rightSeats = 0;
             let centerSeats = 0;
 
-            // Initialize all parties with empty seats array
             Object.keys(PARTIES).forEach(p => {
                 partySeatsMap[p] = [];
             });
 
             Object.keys(electionData).forEach(electorate => {
                 if (isCurrentRollElectorate(electorate)) {
-                    const party = electionData[electorate];
+                    const item = electionData[electorate];
+                    const party = item.leadingParty || "Undeclared";
+                    
                     if (partySeatsMap[party]) {
                         partySeatsMap[party].push(electorate);
                     }
@@ -767,7 +787,6 @@
                 }
             });
 
-            // Update Government Formation Progress Bar
             const progressBar = document.getElementById('bloc-progress-bar');
             
             let leftHtml = `<div class="bloc-left-container">`;
@@ -824,7 +843,6 @@
             const container = document.getElementById('party-leaderboard');
             container.innerHTML = '';
 
-            // Sort parties by seat count first, then by party vote percentage
             const sortedParties = Object.keys(PARTIES).sort((a, b) => {
                 const seatsA = (partySeatsMap[a] || []).length;
                 const seatsB = (partySeatsMap[b] || []).length;
@@ -900,10 +918,10 @@
         window.onload = async () => {
             await initMap();
             
-            // Automatically re-fetch data every 60 seconds (60,000 ms)
+            // Automatically re-fetch data every 60 seconds
             setInterval(async () => {
                 await fetchData();
-                updateLeaderboard();
+                await loadGeoJSON();
             }, 60000);
         };
     </script>
