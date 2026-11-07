@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Bothy — 2026 NZ Election Tracker</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --bg-dark: #0a0a0c;
+            --bg-panel: #141417;
+            --text-light: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --border-color: #27272a;
+            --accent: #3b82f6;
+            --font-main: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-main);
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Top Navigation Header */
+        header {
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand h1 {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+        }
+
+        .badge-container {
+            display: flex;
+            gap: 8px;
+        }
+
+        .badge {
+            background-color: #27272a;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge.highlight {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn-toggle {
+            background-color: #18181b;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-toggle:hover {
+            background-color: #27272a;
+            color: #ffffff;
+        }
+
+        .btn-toggle.active {
+            background-color: var(--accent);
+            color: #ffffff;
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Main Dashboard Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            position: relative;
+            height: calc(100vh - 57px);
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+            background-color: #09090b;
+        }
+
+        /* Sidebar Leaderboard */
+        sidebar {
+            width: 380px;
+            background-color: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            z-index: 500;
+        }
+
+        /* Government Majority Progress Card */
+        .gov-progress-card {
+            background-color: #18181b;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .gov-progress-title {
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .gov-progress-target {
+            color: #f59e0b;
+            font-family: var(--font-mono);
+        }
+
+        .bloc-bars {
+            display: flex;
+            height: 24px;
+            border-radius: 4px;
+            overflow: hidden;
+            background-color: #27272a;
+            position: relative;
+            border: 1px solid #3f3f46;
+        }
+
+        .bloc-bar-segment {
+            height: 100%;
+            transition: width 0.4s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #fff;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .bloc-left-container {
+            display: flex;
+            height: 100%;
+            flex-grow: 1;
+        }
+
+        .bloc-right-container {
+            display: flex;
+            height: 100%;
+            flex-grow: 1;
+            flex-direction: row-reverse;
+        }
+
+        .majority-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50.8%;
+            width: 2px;
+            background-color: #ffffff;
+            z-index: 10;
+            box-shadow: 0 0 4px #000;
+        }
+
+        .majority-tooltip {
+            position: absolute;
+            top: -18px;
+            transform: translateX(-50%);
+            font-size: 0.6rem;
+            font-family: var(--font-mono);
+            background: #ffffff;
+            color: #000;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: 800;
+            left: 50.8%;
+        }
+
+        .scenario-alert {
+            background-color: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 0.75rem;
+            color: #fbbf24;
+            line-height: 1.3;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: 4px;
+        }
+
+        .sidebar-title {
+            font-size: 0.82rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+        }
+
+        .meta-status {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: #34d399;
+        }
+
+        #party-leaderboard {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .party-card-wrapper {
+            background-color: #18181b;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: border-color 0.2s ease;
+        }
+
+        .party-card-wrapper:hover {
+            border-color: #3f3f46;
+        }
+
+        .party-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-left: 5px solid #555;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .party-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .party-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #ffffff;
+        }
+
+        .party-badge {
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-right { background-color: rgba(0, 82, 159, 0.2); color: #60a5fa; }
+        .badge-left { background-color: rgba(216, 42, 32, 0.2); color: #f87171; }
+        .badge-center { background-color: rgba(147, 51, 234, 0.2); color: #c084fc; }
+
+        .party-seats {
+            font-family: var(--font-mono);
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        /* Accordion Dropdown Seat List */
+        .seat-dropdown {
+            max-height: 0;
+            overflow-y: auto;
+            background-color: #121215;
+            transition: max-height 0.25s ease-out;
+            border-top: 1px solid transparent;
+        }
+
+        .party-card-wrapper.expanded .seat-dropdown {
+            max-height: 220px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .seat-item {
+            padding: 8px 16px 8px 24px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: background-color 0.1s ease, color 0.1s ease;
+        }
+
+        .seat-item:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+            color: #ffffff;
+        }
+
+        .seat-item::after {
+            content: "→";
+            opacity: 0;
+            transition: opacity 0.1s ease;
+        }
+
+        .seat-item:hover::after {
+            opacity: 1;
+        }
+
+        /* Custom Leaflet Tooltip Styling */
+        .leaflet-tooltip-custom {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-light);
+            font-family: var(--font-main);
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
+        }
+
+        .leaflet-tooltip-custom strong {
+            font-size: 0.95rem;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <h1>The Bothy</h1>
+            <div class="badge-container">
+                <span class="badge highlight">2026 Election</span>
+                <span class="badge">NZ Tracker</span>
+            </div>
+        </div>
+        <div class="controls">
+            <button id="btn-general" class="btn-toggle active" onclick="switchRoll('general')">General Roll (64)</button>
+            <button id="btn-maori" class="btn-toggle" onclick="switchRoll('maori')">Māori Roll (7)</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div id="map"></div>
+        <sidebar>
+            <!-- Government Majority Progress Card -->
+            <div class="gov-progress-card">
+                <div class="gov-progress-title">
+                    <span>Government Formation</span>
+                    <span class="gov-progress-target">Majority: 61 Seats</span>
+                </div>
+                <div class="bloc-bars" id="bloc-progress-bar">
+                    <!-- Dynamic split bar inserted via JS -->
+                </div>
+                <div id="scenario-box" class="scenario-alert" style="display: none;">
+                    <span>⚠️ <strong>Kingmaker Scenario:</strong> Neither Left nor Right bloc can reach 61 seats without TOP!</span>
+                </div>
+            </div>
+
+            <div class="sidebar-header">
+                <span class="sidebar-title" id="sidebar-subtitle">General Roll Seats</span>
+                <span id="vote-progress" class="meta-status">Loading feed...</span>
+            </div>
+            <div id="party-leaderboard">
+                <!-- Populated dynamically -->
+            </div>
+        </sidebar>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        const PARTIES = {
+            "National": { color: "#00529F", bloc: "right", badge: "Right" },
+            "ACT": { color: "#FDE047", bloc: "right", badge: "Right" },
+            "NZ First": { color: "#000000", bloc: "right", badge: "Right" },
+            "Labour": { color: "#D82A20", bloc: "left", badge: "Left" },
+            "Green": { color: "#098137", bloc: "left", badge: "Left" },
+            "Te Pāti Māori": { color: "#B2001A", bloc: "left", badge: "Left" },
+            "The Opportunities Party (TOP)": { color: "#008751", bloc: "center", badge: "Center" },
+            "Independent": { color: "#71717a", bloc: "center", badge: "Center" },
+            "Undeclared": { color: "#27272a", bloc: "none", badge: "" }
+        };
+
+        const MAORI_ELECTORATES = new Set([
+            "Hauraki-Waikato", "Ikaroa-Rāwhiti", "Ikaroa-Rawhiti",
+            "Tāmaki Makaurau", "Tamaki Makaurau", "Te Tai Hauāuru",
+            "Te Tai Hauauru", "Te Tai Tokerau", "Te Tai Tonga", "Waiariki"
+        ]);
+
+        let map;
+        let geojsonLayer;
+        let currentRoll = 'general';
+        let electionData = {};
+        let normalizedData = {};
+        let electorateLayers = {};
+
+        function normalizeName(str) {
+            if (!str) return "";
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+        }
+
+        function getElectorateName(props) {
+            if (!props) return "";
+            return props.ELECTORATE_NAME || 
+                   props.GED2025_V1_00_NAME || 
+                   props.MED2025_V1_00_NAME || 
+                   props.electorate_name || 
+                   props.name || 
+                   props.NAME || 
+                   props.Electorate || "";
+        }
+
+        function standardizePartyName(name) {
+            if (!name) return "Undeclared";
+            if (name.includes("National")) return "National";
+            if (name.includes("Labour")) return "Labour";
+            if (name.includes("Green")) return "Green";
+            if (name.includes("ACT")) return "ACT";
+            if (name.includes("Māori") || name.includes("Maori")) return "Te Pāti Māori";
+            if (name.includes("NZ First") || name.includes("New Zealand First")) return "NZ First";
+            if (name.includes("Opportunities") || name.includes("TOP")) return "The Opportunities Party (TOP)";
+            return "Independent";
+        }
+
+        function isCurrentRollElectorate(name) {
+            const isMaori = MAORI_ELECTORATES.has(name) || MAORI_ELECTORATES.has(normalizeName(name));
+            return currentRoll === 'maori' ? isMaori : !isMaori;
+        }
+
+        async function initMap() {
+            map = L.map('map', {
+                zoomControl: true,
+                attributionControl: false
+            });
+
+            // Lock initial map bounds firmly over New Zealand
+            const nzBounds = [
+                [-47.5, 166.0], 
+                [-34.0, 178.5]
+            ];
+            map.fitBounds(nzBounds);
+
+            L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+                maxZoom: 20,
+                attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
+            }).addTo(map);
+
+            await fetchData();
+            await loadGeoJSON();
+        }
+
+        async function fetchData() {
+            try {
+                const res = await fetch('https://api.bothynews.co.nz/api/results');
+                
+                if (res.ok) {
+                    const rawData = await res.json();
+                    
+                    if (rawData.statistics && rawData.statistics.percentageCounted) {
+                        document.getElementById('vote-progress').innerText = `${rawData.statistics.percentageCounted}% Counted`;
+                    }
+
+                    electionData = {};
+                    normalizedData = {};
+
+                    const electorateList = rawData.electorates || rawData;
+
+                    Object.keys(electorateList).forEach(key => {
+                        const item = electorateList[key];
+                        const rawParty = (typeof item === 'object') ? item.leadingParty : item;
+                        const party = standardizePartyName(rawParty);
+
+                        electionData[key] = party;
+                        normalizedData[normalizeName(key)] = party;
+                    });
+                }
+
+                
+            } catch (err) {
+                console.warn("Could not load data.json:", err);
+            }
+        }
+
+        function getElectorateColor(electorateName) {
+            let party = electionData[electorateName];
+            if (!party) {
+                party = normalizedData[normalizeName(electorateName)];
+            }
+            party = party || "Undeclared";
+            return (PARTIES[party] ? PARTIES[party].color : PARTIES["Undeclared"].color);
+        }
+
+        async function loadGeoJSON() {
+            const fname = currentRoll === 'general' 
+                ? 'general-electorates.geojson' 
+                : 'maori-electorates.geojson';
+
+            const res = await fetch(`https://api.yourdomain.co.nz/${fname}`);
+            if (geojsonLayer) {
+                map.removeLayer(geojsonLayer);
+            }
+
+            electorateLayers = {};
+            const filename = currentRoll === 'general' 
+                ? 'general-electorates.geojson' 
+                : 'maori-electorates.geojson';
+
+            try {
+                const res = await fetch(`/${filename}`);
+                if (!res.ok) {
+                    console.error(`HTTP error fetching ${filename}: ${res.status}`);
+                    return;
+                }
+                const data = await res.json();
+
+                geojsonLayer = L.geoJSON(data, {
+                    style: function(feature) {
+                        const name = getElectorateName(feature.properties);
+                        return {
+                            fillColor: getElectorateColor(name),
+                            weight: 1.5,
+                            opacity: 0.9,
+                            color: '#27272a',
+                            fillOpacity: 0.7
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const name = getElectorateName(feature.properties);
+                        if (name) {
+                            electorateLayers[name] = layer;
+                        }
+
+                        let party = electionData[name] || normalizedData[normalizeName(name)] || "Awaiting Results";
+                        
+                        layer.bindTooltip(`<strong>${name}</strong><br/>${party}`, {
+                            sticky: true,
+                            className: 'leaflet-tooltip-custom'
+                        });
+
+                        layer.on({
+                            mouseover: (e) => {
+                                const l = e.target;
+                                l.setStyle({
+                                    weight: 3,
+                                    color: '#60a5fa',
+                                    fillOpacity: 0.85
+                                });
+                                l.bringToFront();
+                            },
+                            mouseout: (e) => {
+                                geojsonLayer.resetStyle(e.target);
+                            }
+                        });
+                    }
+                }).addTo(map);
+
+                // NOTE: Removed automatic fitBounds override here to keep the map locked over NZ.
+                updateLeaderboard();
+            } catch (err) {
+                console.error(`Failed to load ${filename}:`, err);
+            }
+        }
+
+        async function switchRoll(rollType) {
+            currentRoll = rollType;
+            document.getElementById('btn-general').classList.toggle('active', rollType === 'general');
+            document.getElementById('btn-maori').classList.toggle('active', rollType === 'maori');
+            document.getElementById('sidebar-subtitle').innerText = rollType === 'general' ? 'General Roll Seats' : 'Māori Roll Seats';
+            await loadGeoJSON();
+        }
+
+        function zoomToSeat(electorateName) {
+            const layer = electorateLayers[electorateName];
+            if (layer) {
+                map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 11 });
+                layer.setStyle({ weight: 4, color: '#ffffff', fillOpacity: 0.9 });
+                layer.bringToFront();
+                setTimeout(() => {
+                    geojsonLayer.resetStyle(layer);
+                }, 1500);
+            }
+        }
+
+        function togglePartyAccordion(wrapperElement) {
+            const wasExpanded = wrapperElement.classList.contains('expanded');
+            document.querySelectorAll('.party-card-wrapper').forEach(w => w.classList.remove('expanded'));
+            if (!wasExpanded) {
+                wrapperElement.classList.add('expanded');
+            }
+        }
+
+        function updateLeaderboard() {
+            const partySeatsMap = {};
+            let leftSeats = 0;
+            let rightSeats = 0;
+            let centerSeats = 0;
+
+            Object.keys(electionData).forEach(electorate => {
+                if (isCurrentRollElectorate(electorate)) {
+                    const party = electionData[electorate];
+                    if (!partySeatsMap[party]) {
+                        partySeatsMap[party] = [];
+                    }
+                    partySeatsMap[party].push(electorate);
+
+                    if (PARTIES[party]) {
+                        if (PARTIES[party].bloc === "left") leftSeats++;
+                        if (PARTIES[party].bloc === "right") rightSeats++;
+                        if (PARTIES[party].bloc === "center") centerSeats++;
+                    }
+                }
+            });
+
+            const progressBar = document.getElementById('bloc-progress-bar');
+            
+            let leftHtml = `<div class="bloc-left-container">`;
+            Object.keys(PARTIES).forEach(party => {
+                if (PARTIES[party].bloc === "left") {
+                    const count = (partySeatsMap[party] || []).length;
+                    if (count > 0) {
+                        const pct = (count / 120) * 100;
+                        leftHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+                    }
+                }
+            });
+            leftHtml += `</div>`;
+
+            let centerHtml = `<div style="display: flex; height: 100%;">`;
+            Object.keys(PARTIES).forEach(party => {
+                if (PARTIES[party].bloc === "center") {
+                    const count = (partySeatsMap[party] || []).length;
+                    if (count > 0) {
+                        const pct = (count / 120) * 100;
+                        centerHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+                    }
+                }
+            });
+            centerHtml += `</div>`;
+
+            let rightHtml = `<div class="bloc-right-container">`;
+            Object.keys(PARTIES).forEach(party => {
+                if (PARTIES[party].bloc === "right") {
+                    const count = (partySeatsMap[party] || []).length;
+                    if (count > 0) {
+                        const pct = (count / 120) * 100;
+                        rightHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+                    }
+                }
+            });
+            rightHtml += `</div>`;
+
+            progressBar.innerHTML = `
+                <div class="majority-line"></div>
+                <div class="majority-tooltip">61</div>
+                ${leftHtml}
+                ${centerHtml}
+                ${rightHtml}
+            `;
+
+            const scenarioBox = document.getElementById('scenario-box');
+            if (leftSeats < 61 && rightSeats < 61 && (leftSeats + centerSeats >= 61 || rightSeats + centerSeats >= 61)) {
+                scenarioBox.style.display = "flex";
+            } else {
+                scenarioBox.style.display = "none";
+            }
+
+            const container = document.getElementById('party-leaderboard');
+            container.innerHTML = '';
+
+            Object.keys(PARTIES).forEach(party => {
+                if (party === "Undeclared") return;
+                const seatsList = partySeatsMap[party] || [];
+                const seatCount = seatsList.length;
+                
+                if (seatCount === 0) return;
+                seatsList.sort();
+
+                const partyMeta = PARTIES[party];
+                const wrapper = document.createElement('div');
+                wrapper.className = 'party-card-wrapper';
+
+                const card = document.createElement('div');
+                card.className = 'party-card';
+                card.style.borderLeftColor = partyMeta.color;
+                card.onclick = () => togglePartyAccordion(wrapper);
+
+                card.innerHTML = `
+                    <div class="party-info">
+                        <span class="party-name">${party}</span>
+                        <span class="party-badge badge-${partyMeta.bloc}">${partyMeta.badge}</span>
+                    </div>
+                    <span class="party-seats" style="color: ${partyMeta.color}">${seatCount}</span>
+                `;
+                wrapper.appendChild(card);
+
+                const dropdown = document.createElement('div');
+                dropdown.className = 'seat-dropdown';
+
+                seatsList.forEach(seat => {
+                    const seatItem = document.createElement('div');
+                    seatItem.className = 'seat-item';
+                    seatItem.innerText = seat;
+                    seatItem.onclick = (e) => {
+                        e.stopPropagation();
+                        zoomToSeat(seat);
+                    };
+                    dropdown.appendChild(seatItem);
+                });
+
+                wrapper.appendChild(dropdown);
+                container.appendChild(wrapper);
+            });
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>
