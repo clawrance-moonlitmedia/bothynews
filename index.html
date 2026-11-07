@@ -515,13 +515,17 @@
             "ACT": { color: "#FDE047", bloc: "right", badge: "Right" },
             "NZ First": { color: "#000000", bloc: "right", badge: "Right" },
             "Te Pāti Māori": { color: "#B2001A", bloc: "left", badge: "Left" },
-            "The Opportunities Party (TOP)": { color: "#008751", bloc: "center", badge: "Center" },
+            "Opportunity Party": { color: "#008751", bloc: "center", badge: "Center" },
             "Aotearoa Legalise Cannabis Party": { color: "#15803d", bloc: "none", badge: "Other" },
             "Animal Justice Party": { color: "#0d9488", bloc: "none", badge: "Other" },
-            "Freedoms NZ": { color: "#c026d3", bloc: "none", badge: "Other" },
+            "Conservative Party NZ": { color: "#0284c7", bloc: "none", badge: "Other" },
+            "Free Palestine": { color: "#059669", bloc: "none", badge: "Other" },
             "New Zealand Loyal": { color: "#b91c1c", bloc: "none", badge: "Other" },
-            "NewZeal": { color: "#4338ca", bloc: "none", badge: "Other" },
+            "NZ Outdoors & Freedom Party": { color: "#d97706", bloc: "none", badge: "Other" },
+            "Te Tai Tokerau Party": { color: "#991b1b", bloc: "none", badge: "Other" },
             "Vision NZ": { color: "#7c3aed", bloc: "none", badge: "Other" },
+            "Women’s Rights Party": { color: "#db2777", bloc: "none", badge: "Other" },
+            "Alliance Party": { color: "#dc2626", bloc: "none", badge: "Other" },
             "Independent": { color: "#71717a", bloc: "center", badge: "Center" }
         };
 
@@ -537,7 +541,7 @@
         let electionData = {};
         let normalizedData = {};
         let partyVoteData = {};
-        let electorateLayers = {}; // Stores map layer references by name
+        let electorateLayers = {};
 
         function normalizeName(str) {
             if (!str) return "";
@@ -563,13 +567,17 @@
             if (name.includes("ACT")) return "ACT";
             if (name.includes("Māori") || name.includes("Maori")) return "Te Pāti Māori";
             if (name.includes("NZ First") || name.includes("New Zealand First")) return "NZ First";
-            if (name.includes("Opportunities") || name.includes("TOP")) return "The Opportunities Party (TOP)";
+            if (name.includes("Opportunities") || name.includes("TOP")) return "Opportunity Party";
             if (name.includes("Cannabis")) return "Aotearoa Legalise Cannabis Party";
             if (name.includes("Animal")) return "Animal Justice Party";
-            if (name.includes("Freedoms")) return "Freedoms NZ";
+            if (name.includes("Conservative")) return "Conservative Party NZ";
+            if (name.includes("Free Palestine")) return "Free Palestine";
             if (name.includes("Loyal")) return "New Zealand Loyal";
-            if (name.includes("NewZeal")) return "NewZeal";
+            if (name.includes("Outdoors")) return "NZ Outdoors & Freedom Party";
+            if (name.includes("Te Tai Tokerau Party")) return "Te Tai Tokerau Party";
             if (name.includes("Vision")) return "Vision NZ";
+            if (name.includes("Women")) return "Women’s Rights Party";
+            if (name.includes("Alliance")) return "Alliance Party";
             return "Independent";
         }
 
@@ -595,10 +603,7 @@
                 attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
             }).addTo(map);
 
-            // 1. Load GeoJSON boundaries ONCE on startup
             await loadGeoJSONOnce();
-            
-            // 2. Fetch live data and apply initial colors/tooltips
             await refreshLiveData();
 
             setTimeout(() => { map.invalidateSize(); }, 250);
@@ -686,7 +691,6 @@
                         normalizedData[normalizeName(key)] = item;
                     });
 
-                    // Update map polygons and tooltips dynamically in place without reloading GeoJSON
                     Object.keys(electorateLayers).forEach(name => {
                         const layer = electorateLayers[name];
                         const fillColor = getElectorateColor(name);
@@ -764,7 +768,6 @@
             document.getElementById('btn-maori').classList.toggle('active', rollType === 'maori');
             document.getElementById('sidebar-subtitle').innerText = rollType === 'general' ? 'General Roll Seats' : 'Māori Roll Seats';
             
-            // Re-load boundaries only when toggling between rolls
             await loadGeoJSONOnce();
             await refreshLiveData();
             setTimeout(() => { map.invalidateSize(); }, 200);
@@ -948,7 +951,6 @@
         window.onload = async () => {
             await initMap();
             
-            // Poll vote updates every 60 seconds without re-downloading GeoJSON bounds
             setInterval(async () => {
                 await refreshLiveData();
             }, 60000);
