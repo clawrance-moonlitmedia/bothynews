@@ -497,13 +497,13 @@
                 attributionControl: false
             });
 
-            // Lock initial map bounds firmly over New Zealand
             const nzBounds = [
                 [-47.5, 166.0], 
                 [-34.0, 178.5]
             ];
             map.fitBounds(nzBounds);
 
+            // Domain-authenticated Stadia Maps tile layer
             L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
                 maxZoom: 20,
                 attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
@@ -520,14 +520,14 @@
                 if (res.ok) {
                     const rawData = await res.json();
                     
-                    if (rawData.statistics && rawData.statistics.percentageCounted) {
+                    if (rawData.statistics && rawData.statistics.percentageCounted !== undefined) {
                         document.getElementById('vote-progress').innerText = `${rawData.statistics.percentageCounted}% Counted`;
                     }
 
                     electionData = {};
                     normalizedData = {};
 
-                    const electorateList = rawData.electorates || rawData;
+                    const electorateList = rawData.electorates || {};
 
                     Object.keys(electorateList).forEach(key => {
                         const item = electorateList[key];
