@@ -559,7 +559,7 @@
                 ? 'general-electorates.geojson' 
                 : 'maori-electorates.geojson';
 
-            const res = await fetch(`https://api.bothynews.co.nz/${fname}`);
+            const res = await fetch(`https://api.bothynews.co.nz/api/${fname}`);
             if (geojsonLayer) {
                 map.removeLayer(geojsonLayer);
             }
