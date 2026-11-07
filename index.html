@@ -537,7 +537,7 @@
         let electionData = {};
         let normalizedData = {};
         let partyVoteData = {};
-        let electorateLayers = {};
+        let electorateLayers = {}; // Stores map layer references by name
 
         function normalizeName(str) {
             if (!str) return "";
@@ -595,13 +595,75 @@
                 attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
             }).addTo(map);
 
-            await fetchData();
-            await loadGeoJSON();
+            // 1. Load GeoJSON boundaries ONCE on startup
+            await loadGeoJSONOnce();
             
+            // 2. Fetch live data and apply initial colors/tooltips
+            await refreshLiveData();
+
             setTimeout(() => { map.invalidateSize(); }, 250);
         }
 
-        async function fetchData() {
+        async function loadGeoJSONOnce() {
+            const filename = currentRoll === 'general' 
+                ? 'general-electorates.geojson' 
+                : 'maori-electorates.geojson';
+
+            try {
+                const res = await fetch(`https://api.bothynews.co.nz/api/${filename}`);
+                if (!res.ok) {
+                    console.error(`HTTP error fetching ${filename}: ${res.status}`);
+                    return;
+                }
+                const data = await res.json();
+
+                if (geojsonLayer) {
+                    map.removeLayer(geojsonLayer);
+                }
+
+                electorateLayers = {};
+
+                geojsonLayer = L.geoJSON(data, {
+                    style: function(feature) {
+                        const name = getElectorateName(feature.properties);
+                        return {
+                            fillColor: getElectorateColor(name),
+                            weight: 1.5,
+                            opacity: 0.9,
+                            color: '#27272a',
+                            fillOpacity: 0.7
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const name = getElectorateName(feature.properties);
+                        if (name) {
+                            electorateLayers[name] = layer;
+                        }
+
+                        updateLayerTooltipAndStyle(layer, name);
+
+                        layer.on({
+                            mouseover: (e) => {
+                                const l = e.target;
+                                l.setStyle({
+                                    weight: 3,
+                                    color: '#60a5fa',
+                                    fillOpacity: 0.85
+                                });
+                                l.bringToFront();
+                            },
+                            mouseout: (e) => {
+                                geojsonLayer.resetStyle(e.target);
+                            }
+                        });
+                    }
+                }).addTo(map);
+            } catch (err) {
+                console.error(`Failed to load ${filename}:`, err);
+            }
+        }
+
+        async function refreshLiveData() {
             try {
                 const res = await fetch('https://api.bothynews.co.nz/api/results');
                 
@@ -623,9 +685,19 @@
                         electionData[key] = item;
                         normalizedData[normalizeName(key)] = item;
                     });
+
+                    // Update map polygons and tooltips dynamically in place without reloading GeoJSON
+                    Object.keys(electorateLayers).forEach(name => {
+                        const layer = electorateLayers[name];
+                        const fillColor = getElectorateColor(name);
+                        layer.setStyle({ fillColor: fillColor });
+                        updateLayerTooltipAndStyle(layer, name);
+                    });
+
+                    updateLeaderboard();
                 }
             } catch (err) {
-                console.warn("Could not load election results:", err);
+                console.warn("Could not sync live election results:", err);
             }
         }
 
@@ -638,105 +710,51 @@
             return (PARTIES[party] ? PARTIES[party].color : "#27272a");
         }
 
-        async function loadGeoJSON() {
-            const filename = currentRoll === 'general' 
-                ? 'general-electorates.geojson' 
-                : 'maori-electorates.geojson';
+        function updateLayerTooltipAndStyle(layer, name) {
+            let item = electionData[name] || normalizedData[normalizeName(name)] || { leadingParty: "Awaiting Results", percentCounted: 0, final: false, candidates: [] };
+            const party = item.leadingParty || "Awaiting Results";
+            const elPct = item.percentCounted !== undefined ? item.percentCounted : 0.0;
+            const isFinal = item.final === true;
 
-            if (geojsonLayer) {
-                map.removeLayer(geojsonLayer);
+            let statusBadge = `<span style="font-size: 0.65rem; color: #a1a1aa; font-family: var(--font-mono);">${elPct}% counted</span>`;
+            if (isFinal) {
+                statusBadge = `<span style="font-size: 0.65rem; background-color: rgba(16, 185, 129, 0.2); color: #34d399; padding: 1px 5px; border-radius: 4px; font-weight: 700; font-family: var(--font-mono);">✓ Seat Won</span>`;
+            }
+            
+            let candidatesHtml = '';
+            if (item.candidates && item.candidates.length > 0) {
+                candidatesHtml = '<div style="margin-top: 6px; border-top: 1px solid #27272a; padding-top: 6px; display: flex; flex-direction: column; gap: 3px;">';
+                item.candidates.forEach(c => {
+                    candidatesHtml += `
+                        <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 0.72rem;">
+                            <span style="color: #d4d4d8;"><b>${c.name}</b> (${c.party})</span>
+                            <span style="font-family: var(--font-mono); color: #a1a1aa;">${c.votes.toLocaleString()}</span>
+                        </div>
+                    `;
+                });
+                candidatesHtml += '</div>';
             }
 
-            electorateLayers = {};
+            let tooltipContent = `
+                <div style="font-family: var(--font-main);">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #27272a; padding-bottom: 4px; margin-bottom: 4px;">
+                        <strong style="font-size: 0.88rem; color: #ffffff;">${name}</strong>
+                        ${statusBadge}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #60a5fa; font-weight: 600; margin-bottom: 2px;">
+                        Leading: ${party}
+                    </div>
+                    ${candidatesHtml}
+                </div>
+            `;
 
-            try {
-                const res = await fetch(`https://api.bothynews.co.nz/api/${filename}`);
-                if (!res.ok) {
-                    console.error(`HTTP error fetching ${filename}: ${res.status}`);
-                    return;
-                }
-                const data = await res.json();
-
-                geojsonLayer = L.geoJSON(data, {
-                    style: function(feature) {
-                        const name = getElectorateName(feature.properties);
-                        return {
-                            fillColor: getElectorateColor(name),
-                            weight: 1.5,
-                            opacity: 0.9,
-                            color: '#27272a',
-                            fillOpacity: 0.7
-                        };
-                    },
-                    onEachFeature: function(feature, layer) {
-                        const name = getElectorateName(feature.properties);
-                        if (name) {
-                            electorateLayers[name] = layer;
-                        }
-
-                        let item = electionData[name] || normalizedData[normalizeName(name)] || { leadingParty: "Awaiting Results", percentCounted: 0, final: false, candidates: [] };
-                        const party = item.leadingParty || "Awaiting Results";
-                        const elPct = item.percentCounted !== undefined ? item.percentCounted : 0.0;
-                        const isFinal = item.final === true;
-
-                        // Status badge display logic
-                        let statusBadge = `<span style="font-size: 0.65rem; color: #a1a1aa; font-family: var(--font-mono);">${elPct}% counted</span>`;
-                        if (isFinal) {
-                            statusBadge = `<span style="font-size: 0.65rem; background-color: rgba(16, 185, 129, 0.2); color: #34d399; padding: 1px 5px; border-radius: 4px; font-weight: 700; font-family: var(--font-mono);">✓ Seat Won</span>`;
-                        }
-                        
-                        let candidatesHtml = '';
-                        if (item.candidates && item.candidates.length > 0) {
-                            candidatesHtml = '<div style="margin-top: 6px; border-top: 1px solid #27272a; padding-top: 6px; display: flex; flex-direction: column; gap: 3px;">';
-                            item.candidates.forEach(c => {
-                                candidatesHtml += `
-                                    <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 0.72rem;">
-                                        <span style="color: #d4d4d8;"><b>${c.name}</b> (${c.party})</span>
-                                        <span style="font-family: var(--font-mono); color: #a1a1aa;">${c.votes.toLocaleString()}</span>
-                                    </div>
-                                `;
-                            });
-                            candidatesHtml += '</div>';
-                        }
-
-                        let tooltipContent = `
-                            <div style="font-family: var(--font-main);">
-                                <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #27272a; padding-bottom: 4px; margin-bottom: 4px;">
-                                    <strong style="font-size: 0.88rem; color: #ffffff;">${name}</strong>
-                                    ${statusBadge}
-                                </div>
-                                <div style="font-size: 0.75rem; color: #60a5fa; font-weight: 600; margin-bottom: 2px;">
-                                    Leading: ${party}
-                                </div>
-                                ${candidatesHtml}
-                            </div>
-                        `;
-
-                        layer.bindTooltip(tooltipContent, {
-                            sticky: true,
-                            className: 'leaflet-tooltip-custom'
-                        });
-
-                        layer.on({
-                            mouseover: (e) => {
-                                const l = e.target;
-                                l.setStyle({
-                                    weight: 3,
-                                    color: '#60a5fa',
-                                    fillOpacity: 0.85
-                                });
-                                l.bringToFront();
-                            },
-                            mouseout: (e) => {
-                                geojsonLayer.resetStyle(e.target);
-                            }
-                        });
-                    }
-                }).addTo(map);
-
-                updateLeaderboard();
-            } catch (err) {
-                console.error(`Failed to load ${filename}:`, err);
+            if (layer.getTooltip()) {
+                layer.setTooltipContent(tooltipContent);
+            } else {
+                layer.bindTooltip(tooltipContent, {
+                    sticky: true,
+                    className: 'leaflet-tooltip-custom'
+                });
             }
         }
 
@@ -745,7 +763,10 @@
             document.getElementById('btn-general').classList.toggle('active', rollType === 'general');
             document.getElementById('btn-maori').classList.toggle('active', rollType === 'maori');
             document.getElementById('sidebar-subtitle').innerText = rollType === 'general' ? 'General Roll Seats' : 'Māori Roll Seats';
-            await loadGeoJSON();
+            
+            // Re-load boundaries only when toggling between rolls
+            await loadGeoJSONOnce();
+            await refreshLiveData();
             setTimeout(() => { map.invalidateSize(); }, 200);
         }
 
@@ -927,10 +948,9 @@
         window.onload = async () => {
             await initMap();
             
-            // Automatically re-fetch data every 60 seconds
+            // Poll vote updates every 60 seconds without re-downloading GeoJSON bounds
             setInterval(async () => {
-                await fetchData();
-                await loadGeoJSON();
+                await refreshLiveData();
             }, 60000);
         };
     </script>
