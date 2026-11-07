@@ -94,7 +94,522 @@
         }
 
         .badge {
-            background-color: #27272a;
+            background-color: #27272a; const PARTIES = {
+            "National": { color: "#00529F", bloc: "right", badge: "Right" },
+            "Labour": { color: "#D82A20", bloc: "left", badge: "Left" },
+            "Green": { color: "#098137", bloc: "left", badge: "Left" },
+            "ACT": { color: "#FDE047", bloc: "right", badge: "Right" },
+            "NZ First": { color: "#000000", bloc: "right", badge: "Right" },
+            "Te Pāti Māori": { color: "#B2001A", bloc: "left", badge: "Left" },
+            "Opportunity Party": { color: "#008751", bloc: "center", badge: "Center" },
+            "Aotearoa Legalise Cannabis Party": { color: "#15803d", bloc: "none", badge: "Other" },
+            "Animal Justice Party": { color: "#0d9488", bloc: "none", badge: "Other" },
+            "Conservative Party NZ": { color: "#0284c7", bloc: "none", badge: "Other" },
+            "Free Palestine": { color: "#059669", bloc: "none", badge: "Other" },
+            "New Zealand Loyal": { color: "#b91c1c", bloc: "none", badge: "Other" },
+            "NZ Outdoors & Freedom Party": { color: "#d97706", bloc: "none", badge: "Other" },
+            "Te Tai Tokerau Party": { color: "#991b1b", bloc: "none", badge: "Other" },
+            "Vision NZ": { color: "#7c3aed", bloc: "none", badge: "Other" },
+            "Women’s Rights Party": { color: "#db2777", bloc: "none", badge: "Other" },
+            "Alliance Party": { color: "#dc2626", bloc: "none", badge: "Other" },
+            "Independent": { color: "#71717a", bloc: "center", badge: "Center" }
+        };
+
+        const MAORI_ELECTORATES = new Set([
+            "Hauraki-Waikato", "Ikaroa-Rāwhiti", "Ikaroa-Rawhiti",
+            "Tāmaki Makaurau", "Tamaki Makaurau", "Te Tai Hauāuru",
+            "Te Tai Hauauru", "Te Tai Tokerau", "Te Tai Tonga", "Waiariki"
+        ]);
+
+        let map;
+        let geojsonLayer;
+        let currentRoll = 'general';
+        let electionData = {};
+        let normalizedData = {};
+        let partyVoteData = {};
+        let electorateLayers = {};
+
+        function normalizeName(str) {
+            if (!str) return "";
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+        }
+
+        function getElectorateName(props) {
+            if (!props) return "";
+            return props.ELECTORATE_NAME || 
+                   props.GED2025_V1_00_NAME || 
+                   props.MED2025_V1_00_NAME || 
+                   props.electorate_name || 
+                   props.name || 
+                   props.NAME || 
+                   props.Electorate || "";
+        }
+
+        function standardizePartyName(name) {
+            if (!name) return "Undeclared";
+            if (name.includes("National")) return "National";
+            if (name.includes("Labour")) return "Labour";
+            if (name.includes("Green")) return "Green";
+            if (name.includes("ACT")) return "ACT";
+            if (name.includes("Māori") || name.includes("Maori")) return "Te Pāti Māori";
+            if (name.includes("NZ First") || name.includes("New Zealand First")) return "NZ First";
+            if (name.includes("Opportunities") || name.includes("TOP")) return "Opportunity Party";
+            if (name.includes("Cannabis")) return "Aotearoa Legalise Cannabis Party";
+            if (name.includes("Animal")) return "Animal Justice Party";
+            if (name.includes("Conservative")) return "Conservative Party NZ";
+            if (name.includes("Free Palestine")) return "Free Palestine";
+            if (name.includes("Loyal")) return "New Zealand Loyal";
+            if (name.includes("Outdoors")) return "NZ Outdoors & Freedom Party";
+            if (name.includes("Te Tai Tokerau Party")) return "Te Tai Tokerau Party";
+            if (name.includes("Vision")) return "Vision NZ";
+            if (name.includes("Women")) return "Women’s Rights Party";
+            if (name.includes("Alliance")) return "Alliance Party";
+            return "Independent";
+        }
+
+        function isCurrentRollElectorate(name) {
+            const isMaori = MAORI_ELECTORATES.has(name) || MAORI_ELECTORATES.has(normalizeName(name));
+            return currentRoll === 'maori' ? isMaori : !isMaori;
+        }
+
+        async function initMap() {
+            map = L.map('map', {
+                zoomControl: true,
+                attributionControl: false
+            });
+
+            const nzBounds = [
+                [-47.5, 166.0], 
+                [-34.0, 178.5]
+            ];
+            map.fitBounds(nzBounds);
+
+            L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+                maxZoom: 20,
+                attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
+            }).addTo(map);
+
+            await loadGeoJSONOnce();
+            await refreshLiveData();
+
+            setTimeout(() => { map.invalidateSize(); }, 250);
+        }
+
+        async function loadGeoJSONOnce() {
+            const filename = currentRoll === 'general' 
+                ? 'general-electorates.geojson' 
+                : 'maori-electorates.geojson';
+
+            try {
+                const res = await fetch(`https://api.bothynews.co.nz/api/${filename}`);
+                if (!res.ok) {
+                    console.error(`HTTP error fetching ${filename}: ${res.status}`);
+                    return;
+                }
+                const data = await res.json();
+
+                if (geojsonLayer) {
+                    map.removeLayer(geojsonLayer);
+                }
+
+                electorateLayers = {};
+
+                geojsonLayer = L.geoJSON(data, {
+                    style: function(feature) {
+                        const name = getElectorateName(feature.properties);
+                        return {
+                            fillColor: getElectorateColor(name),
+                            weight: 1.5,
+                            opacity: 0.9,
+                            color: '#27272a',
+                            fillOpacity: 0.7
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const name = getElectorateName(feature.properties);
+                        if (name) {
+                            electorateLayers[name] = layer;
+                        }
+
+                        updateLayerTooltipAndStyle(layer, name);
+
+                        layer.on({
+                            mouseover: (e) => {
+                                const l = e.target;
+                                l.setStyle({
+                                    weight: 3,
+                                    color: '#60a5fa',
+                                    fillOpacity: 0.85
+                                });
+                                l.bringToFront();
+                            },
+                            mouseout: (e) => {
+                                geojsonLayer.resetStyle(e.target);
+                            }
+                        });
+                    }
+                }).addTo(map);
+            } catch (err) {
+                console.error(`Failed to load ${filename}:`, err);
+            }
+        }
+
+        async function refreshLiveData() {
+            try {
+                const res = await fetch('https://api.bothynews.co.nz/api/results');
+                
+                if (res.ok) {
+                    const rawData = await res.json();
+                    
+                    if (rawData.statistics && rawData.statistics.percentageCounted !== undefined) {
+                        document.getElementById('vote-progress').innerText = `${rawData.statistics.percentageCounted}% Counted`;
+                    }
+
+                    partyVoteData = rawData.partyVotes || {};
+                    electionData = {};
+                    normalizedData = {};
+
+                    const electorateList = rawData.electorates || {};
+
+                    Object.keys(electorateList).forEach(key => {
+                        const item = electorateList[key];
+                        electionData[key] = item;
+                        normalizedData[normalizeName(key)] = item;
+                    });
+
+                    Object.keys(electorateLayers).forEach(name => {
+                        const layer = electorateLayers[name];
+                        const fillColor = getElectorateColor(name);
+                        layer.setStyle({ fillColor: fillColor });
+                        updateLayerTooltipAndStyle(layer, name);
+                    });
+
+                    updateLeaderboard();
+                }
+            } catch (err) {
+                console.warn("Could not sync live election results:", err);
+            }
+        }
+
+        function getElectorateColor(electorateName) {
+            if (!electorateName) return "#27272a";
+            
+            const cleanTarget = normalizeName(electorateName);
+            
+            // 1. Try exact match or direct normalized match
+            let item = electionData[electorateName] || normalizedData[cleanTarget];
+            
+            // 2. Fallback: fuzzy search through all backend keys by stripping all spaces, hyphens, and macrons
+            if (!item) {
+                const foundKey = Object.keys(electionData).find(k => {
+                    const cleanKey = normalizeName(k).replace(/[\s-]+/g, '');
+                    const targetStripped = cleanTarget.replace(/[\s-]+/g, '');
+                    return cleanKey === targetStripped;
+                });
+                if (foundKey) item = electionData[foundKey];
+            }
+
+            const party = (item && item.leadingParty) ? item.leadingParty : "Undeclared";
+            return (PARTIES[party] ? PARTIES[party].color : "#27272a");
+        }
+
+        function updateLayerTooltipAndStyle(layer, name) {
+            if (!name) return;
+            
+            const cleanTarget = normalizeName(name);
+            let item = electionData[name] || normalizedData[cleanTarget];
+            
+            if (!item) {
+                const foundKey = Object.keys(electionData).find(k => {
+                    const cleanKey = normalizeName(k).replace(/[\s-]+/g, '');
+                    const targetStripped = cleanTarget.replace(/[\s-]+/g, '');
+                    return cleanKey === targetStripped;
+                });
+                if (foundKey) item = electionData[foundKey];
+            }
+
+            item = item || { leadingParty: "Awaiting Results", percentCounted: 0, final: false, candidates: [] };
+            
+            const party = item.leadingParty || "Awaiting Results";
+            const elPct = item.percentCounted !== undefined ? item.percentCounted : 0.0;
+            const isFinal = item.final === true;
+
+            let statusBadge = `<span style="font-size: 0.65rem; color: #a1a1aa; font-family: var(--font-mono);">${elPct}% counted</span>`;
+            if (isFinal) {
+                statusBadge = `<span style="font-size: 0.65rem; background-color: rgba(16, 185, 129, 0.2); color: #34d399; padding: 1px 5px; border-radius: 4px; font-weight: 700; font-family: var(--font-mono);">✓ Seat Won</span>`;
+            }
+            
+            let candidatesHtml = '';
+            if (item.candidates && item.candidates.length > 0) {
+                candidatesHtml = '<div style="margin-top: 6px; border-top: 1px solid #27272a; padding-top: 6px; display: flex; flex-direction: column; gap: 3px;">';
+                item.candidates.forEach(c => {
+                    candidatesHtml += `
+                        <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 0.72rem;">
+                            <span style="color: #d4d4d8;"><b>${c.name}</b> (${c.party})</span>
+                            <span style="font-family: var(--font-mono); color: #a1a1aa;">${c.votes.toLocaleString()}</span>
+                        </div>
+                    `;
+                });
+                candidatesHtml += '</div>';
+            }
+
+            let tooltipContent = `
+                <div style="font-family: var(--font-main);">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #27272a; padding-bottom: 4px; margin-bottom: 4px;">
+                        <strong style="font-size: 0.88rem; color: #ffffff;">${name}</strong>
+                        ${statusBadge}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #60a5fa; font-weight: 600; margin-bottom: 2px;">
+                        Leading: ${party}
+                    </div>
+                    ${candidatesHtml}
+                </div>
+            `;
+
+            if (layer.getTooltip()) {
+                layer.setTooltipContent(tooltipContent);
+            } else {
+                layer.bindTooltip(tooltipContent, {
+                    sticky: true,
+                    className: 'leaflet-tooltip-custom'
+                });
+            }
+        }
+
+        async function switchRoll(rollType) {
+            currentRoll = rollType;
+            document.getElementById('btn-general').classList.toggle('active', rollType === 'general');
+            document.getElementById('btn-maori').classList.toggle('active', rollType === 'maori');
+            document.getElementById('sidebar-subtitle').innerText = rollType === 'general' ? 'General Roll Seats' : 'Māori Roll Seats';
+            
+            await loadGeoJSONOnce();
+            await refreshLiveData();
+            setTimeout(() => { map.invalidateSize(); }, 200);
+        }
+
+        function zoomToSeat(electorateName) {
+            const layer = electorateLayers[electorateName];
+            if (layer) {
+                map.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 11 });
+                layer.setStyle({ weight: 4, color: '#ffffff', fillOpacity: 0.9 });
+                layer.bringToFront();
+                setTimeout(() => {
+                    geojsonLayer.resetStyle(layer);
+                }, 1500);
+            }
+        }
+
+        function togglePartyAccordion(wrapperElement) {
+            const wasExpanded = wrapperElement.classList.contains('expanded');
+            document.querySelectorAll('.party-card-wrapper').forEach(w => w.classList.remove('expanded'));
+            if (!wasExpanded) {
+                wrapperElement.classList.add('expanded');
+            }
+        }
+
+        function updateLeaderboard() {
+    // 1. Compile Electorate Wins (All 71+ seats)
+    const electorateWinsMap = {};
+    Object.keys(PARTIES).forEach(p => { electorateWinsMap[p] = []; });
+
+    Object.keys(electionData).forEach(electorate => {
+        const item = electionData[electorate];
+        const party = item.leadingParty || "Undeclared";
+        if (electorateWinsMap[party]) {
+            electorateWinsMap[party].push(electorate);
+        }
+    });
+
+    // 2. Compute Proportional Entitlements (Sainte-Laguë out of 120 base seats)
+    const totalPartyVotes = Object.values(partyVoteData).reduce((acc, cur) => acc + (cur.votes || 0), 0);
+    const partyTotalSeats = {};
+    const partyListSeats = {};
+    const partyOverhang = {};
+
+    Object.keys(PARTIES).forEach(party => {
+        const pVotes = partyVoteData[party] ? partyVoteData[party].votes : 0;
+        let entitlement = 0;
+        if (totalPartyVotes > 0) {
+            entitlement = Math.round((pVotes / totalPartyVotes) * 120);
+        }
+        const wonCount = (electorateWinsMap[party] || []).length;
+        
+        // If local wins exceed proportional entitlement, overhang occurs
+        const overhang = Math.max(0, wonCount - entitlement);
+        const listSeatsCount = Math.max(0, entitlement - wonCount);
+        
+        partyTotalSeats[party] = wonCount + listSeatsCount;
+        partyListSeats[party] = listSeatsCount;
+        partyOverhang[party] = overhang;
+    });
+
+    // 3. Calculate Bloc Totals for Progress Bar
+    let leftSeats = 0;
+    let rightSeats = 0;
+    let centerSeats = 0;
+
+    Object.keys(PARTIES).forEach(party => {
+        const total = partyTotalSeats[party] || 0;
+        if (PARTIES[party].bloc === "left") leftSeats += total;
+        if (PARTIES[party].bloc === "right") rightSeats += total;
+        if (PARTIES[party].bloc === "center") centerSeats += total;
+    });
+
+    const progressBar = document.getElementById('bloc-progress-bar');
+    
+    let leftHtml = `<div class="bloc-left-container">`;
+    Object.keys(PARTIES).forEach(party => {
+        if (PARTIES[party].bloc === "left") {
+            const count = partyTotalSeats[party] || 0;
+            if (count > 0) {
+                const pct = (count / 120) * 100;
+                leftHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+            }
+        }
+    });
+    leftHtml += `</div>`;
+
+    let centerHtml = `<div style="display: flex; height: 100%;">`;
+    Object.keys(PARTIES).forEach(party => {
+        if (PARTIES[party].bloc === "center") {
+            const count = partyTotalSeats[party] || 0;
+            if (count > 0) {
+                const pct = (count / 120) * 100;
+                centerHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+            }
+        }
+    });
+    centerHtml += `</div>`;
+
+    let rightHtml = `<div class="bloc-right-container">`;
+    Object.keys(PARTIES).forEach(party => {
+        if (PARTIES[party].bloc === "right") {
+            const count = partyTotalSeats[party] || 0;
+            if (count > 0) {
+                const pct = (count / 120) * 100;
+                rightHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+            }
+        }
+    });
+    rightHtml += `</div>`;
+
+    progressBar.innerHTML = `
+        <div class="majority-line"></div>
+        <div class="majority-tooltip">61</div>
+        ${leftHtml}
+        ${centerHtml}
+        ${rightHtml}
+    `;
+
+    const scenarioBox = document.getElementById('scenario-box');
+    if (leftSeats < 61 && rightSeats < 61 && (leftSeats + rightSeats) < 120) {
+        scenarioBox.style.display = 'flex';
+    } else {
+        scenarioBox.style.display = 'none';
+    }
+
+    // 4. Render Party Leaderboard Cards with Dropdown Menu (Electorate + List + Overhang)
+    const leaderboardContainer = document.getElementById('party-leaderboard');
+            leaderboardContainer.innerHTML = '';
+        
+            const sortedParties = Object.keys(PARTIES).sort((a, b) => {
+                const seatsA = partyTotalSeats[a] || 0;
+                const seatsB = partyTotalSeats[b] || 0;
+                if (seatsB !== seatsA) return seatsB - seatsA;
+                const pctA = partyVoteData[a] ? partyVoteData[a].percent : 0;
+                const pctB = partyVoteData[b] ? partyVoteData[b].percent : 0;
+                return pctB - pctA;
+            });
+        
+            sortedParties.forEach(party => {
+                const totalSeats = partyTotalSeats[party] || 0;
+                if (totalSeats === 0 && (!partyVoteData[party] || partyVoteData[party].votes === 0)) {
+                    return;
+                }
+        
+                const wonElectorates = electorateWinsMap[party] || [];
+                const listCount = partyListSeats[party] || 0;
+                const overhangCount = partyOverhang[party] || 0;
+                const pData = partyVoteData[party] || { votes: 0, percent: 0.0 };
+                const badgeType = PARTIES[party].badge.toLowerCase();
+        
+                const wrapper = document.createElement('div');
+                wrapper.className = 'party-card-wrapper';
+        
+                let dropdownContent = '';
+                
+                // Electorate Section
+                dropdownContent += `<div class="seat-section-header">Electorate Seats Won (${wonElectorates.length})</div>`;
+                if (wonElectorates.length > 0) {
+                    wonElectorates.forEach(seat => {
+                        dropdownContent += `
+                            <div class="seat-item" onclick="zoomToSeat('${seat}')">
+                                <span>📍 ${seat}</span>
+                                <span style="font-family: var(--font-mono); font-size: 0.7rem;">Electorate</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    dropdownContent += `<div class="seat-item empty-notice">No local electorate seats won</div>`;
+                }
+        
+                // List Seats Section
+                dropdownContent += `<div class="seat-section-header">Party List Seats (${listCount})</div>`;
+                if (listCount > 0) {
+                    for (let i = 1; i <= listCount; i++) {
+                        dropdownContent += `
+                            <div class="seat-item" style="cursor: default;">
+                                <span>📋 List Candidate #${i}</span>
+                                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #60a5fa;">Proportional</span>
+                            </div>
+                        `;
+                    }
+                } else {
+                    dropdownContent += `<div class="seat-item empty-notice">No list seats allocated</div>`;
+                }
+        
+                // Overhang Section if applicable
+                if (overhangCount > 0) {
+                    dropdownContent += `<div class="seat-section-header" style="color: #f59e0b;">Overhang Seats (${overhangCount})</div>`;
+                    dropdownContent += `
+                        <div class="seat-item empty-notice" style="color: #fbbf24;">
+                            ⚠️ ${overhangCount} extra electorate seat(s) won beyond vote share entitlement.
+                        </div>
+                    `;
+                }
+        
+                wrapper.innerHTML = `
+                    <div class="party-card" style="border-left-color: ${PARTIES[party].color};" onclick="togglePartyAccordion(this.parentElement)">
+                        <div class="party-info">
+                            <div class="party-title-row">
+                                <span class="party-name">${party}</span>
+                                <span class="party-badge badge-${badgeType}">${PARTIES[party].badge}</span>
+                            </div>
+                            <div class="party-votes-sub">
+                                ${pData.percent.toFixed(2)}% party vote (${pData.votes.toLocaleString()} votes)
+                            </div>
+                        </div>
+                        <div class="party-stats-right">
+                            <span class="party-seats-val" style="color: ${PARTIES[party].color};">${totalSeats}</span>
+                            <span class="party-seats-label">Seats</span>
+                        </div>
+                    </div>
+                    <div class="seat-dropdown">
+                        ${dropdownContent}
+                    </div>
+                `;
+        
+                leaderboardContainer.appendChild(wrapper);
+            });
+        }
+
+        window.onload = async () => {
+            await initMap();
+            
+            setInterval(async () => {
+                await refreshLiveData();
+            }, 60000);
+        };
             color: var(--text-muted);
             font-family: var(--font-mono);
             font-size: 0.65rem;
@@ -897,7 +1412,7 @@
 
             const progressBar = document.getElementById('bloc-progress-bar');
             
-            let leftHtml = `<div class="bloc-left-container" title="Left Bloc: ${leftSeats} seats">`;
+            let leftHtml = `<div class="bloc-left-container">`;
             Object.keys(PARTIES).forEach(party => {
                 if (PARTIES[party].bloc === "left") {
                     const count = partyTotalSeats[party] || 0;
@@ -921,7 +1436,7 @@
             });
             centerHtml += `</div>`;
 
-            let rightHtml = `<div class="bloc-right-container" title="Right Bloc: ${rightSeats} seats">`;
+            let rightHtml = `<div class="bloc-right-container">`;
             Object.keys(PARTIES).forEach(party => {
                 if (PARTIES[party].bloc === "right") {
                     const count = partyTotalSeats[party] || 0;
@@ -934,6 +1449,8 @@
             rightHtml += `</div>`;
 
             progressBar.innerHTML = `
+                <div style="position: absolute; top: -18px; left: 8px; font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700; color: #f87171;">Left: ${leftSeats}</div>
+                <div style="position: absolute; top: -18px; right: 8px; font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700; color: #60a5fa;">Right: ${rightSeats}</div>
                 <div class="majority-line" style="left: ${majorityPct}%;"></div>
                 <div class="majority-tooltip" style="left: ${majorityPct}%;">${majorityThreshold}</div>
                 ${leftHtml}
