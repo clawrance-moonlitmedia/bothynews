@@ -45,21 +45,23 @@
         header {
             background-color: var(--bg-panel);
             border-bottom: 1px solid var(--border-color);
-            padding: 12px 24px;
+            padding: 10px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             z-index: 1000;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .brand {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 10px;
         }
 
         .brand h1 {
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             font-weight: 800;
             letter-spacing: -0.5px;
             color: #ffffff;
@@ -67,15 +69,15 @@
 
         .badge-container {
             display: flex;
-            gap: 8px;
+            gap: 6px;
         }
 
         .badge {
             background-color: #27272a;
             color: var(--text-muted);
             font-family: var(--font-mono);
-            font-size: 0.7rem;
-            padding: 4px 8px;
+            font-size: 0.65rem;
+            padding: 3px 6px;
             border-radius: 4px;
             font-weight: 700;
             text-transform: uppercase;
@@ -90,7 +92,7 @@
 
         .controls {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
         }
 
@@ -98,9 +100,9 @@
             background-color: #18181b;
             color: var(--text-muted);
             border: 1px solid var(--border-color);
-            padding: 7px 16px;
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -123,7 +125,8 @@
             display: flex;
             flex: 1;
             position: relative;
-            height: calc(100vh - 57px);
+            height: calc(100vh - 53px);
+            width: 100vw;
         }
 
         #map {
@@ -137,10 +140,10 @@
             width: 380px;
             background-color: var(--bg-panel);
             border-left: 1px solid var(--border-color);
-            padding: 20px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
             overflow-y: auto;
             z-index: 500;
         }
@@ -150,14 +153,14 @@
             background-color: #18181b;
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 14px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
             gap: 8px;
         }
 
         .gov-progress-title {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.8px;
@@ -173,7 +176,7 @@
 
         .bloc-bars {
             display: flex;
-            height: 24px;
+            height: 22px;
             border-radius: 4px;
             overflow: hidden;
             background-color: #27272a;
@@ -188,7 +191,7 @@
             align-items: center;
             justify-content: center;
             font-family: var(--font-mono);
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             font-weight: 700;
             color: #fff;
             overflow: hidden;
@@ -221,13 +224,13 @@
 
         .majority-tooltip {
             position: absolute;
-            top: -18px;
+            top: -16px;
             transform: translateX(-50%);
-            font-size: 0.6rem;
+            font-size: 0.55rem;
             font-family: var(--font-mono);
             background: #ffffff;
             color: #000;
-            padding: 1px 4px;
+            padding: 1px 3px;
             border-radius: 3px;
             font-weight: 800;
             left: 50.8%;
@@ -237,24 +240,24 @@
             background-color: rgba(245, 158, 11, 0.1);
             border: 1px solid rgba(245, 158, 11, 0.3);
             border-radius: 6px;
-            padding: 8px 10px;
-            font-size: 0.75rem;
+            padding: 8px;
+            font-size: 0.72rem;
             color: #fbbf24;
             line-height: 1.3;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .sidebar-header {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         .sidebar-title {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.8px;
@@ -263,14 +266,14 @@
 
         .meta-status {
             font-family: var(--font-mono);
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: #34d399;
         }
 
         #party-leaderboard {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .party-card-wrapper {
@@ -289,7 +292,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-left: 5px solid #555;
             cursor: pointer;
             user-select: none;
@@ -303,13 +306,13 @@
 
         .party-name {
             font-weight: 700;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #ffffff;
         }
 
         .party-badge {
-            font-size: 0.65rem;
-            padding: 2px 6px;
+            font-size: 0.6rem;
+            padding: 2px 5px;
             border-radius: 4px;
             font-family: var(--font-mono);
             font-weight: 700;
@@ -322,11 +325,10 @@
 
         .party-seats {
             font-family: var(--font-mono);
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             font-weight: 700;
         }
 
-        /* Accordion Dropdown Seat List */
         .seat-dropdown {
             max-height: 0;
             overflow-y: auto;
@@ -336,13 +338,13 @@
         }
 
         .party-card-wrapper.expanded .seat-dropdown {
-            max-height: 220px;
+            max-height: 200px;
             border-top: 1px solid var(--border-color);
         }
 
         .seat-item {
-            padding: 8px 16px 8px 24px;
-            font-size: 0.82rem;
+            padding: 8px 14px 8px 20px;
+            font-size: 0.78rem;
             color: var(--text-muted);
             cursor: pointer;
             display: flex;
@@ -357,32 +359,67 @@
             color: #ffffff;
         }
 
-        .seat-item::after {
-            content: "→";
-            opacity: 0;
-            transition: opacity 0.1s ease;
-        }
-
-        .seat-item:hover::after {
-            opacity: 1;
-        }
-
-        /* Custom Leaflet Tooltip Styling */
         .leaflet-tooltip-custom {
             background-color: var(--bg-panel);
             border: 1px solid var(--border-color);
             color: var(--text-light);
             font-family: var(--font-main);
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 600;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
         }
 
         .leaflet-tooltip-custom strong {
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             color: #ffffff;
+        }
+
+        /* Mobile Responsive Breakpoint */
+        @media (max-width: 768px) {
+            body {
+                height: auto;
+                overflow: auto;
+            }
+
+            header {
+                padding: 8px 12px;
+            }
+
+            .brand h1 {
+                font-size: 1rem;
+            }
+
+            .controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .btn-toggle {
+                flex: 1;
+                text-align: center;
+                padding: 8px;
+            }
+
+            .main-container {
+                flex-direction: column;
+                height: auto;
+            }
+
+            #map {
+                width: 100%;
+                height: 55vh;
+                min-height: 350px;
+            }
+
+            sidebar {
+                width: 100%;
+                height: auto;
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+                padding: 12px;
+            }
         }
     </style>
 </head>
@@ -415,7 +452,7 @@
                     <!-- Dynamic split bar inserted via JS -->
                 </div>
                 <div id="scenario-box" class="scenario-alert" style="display: none;">
-                    <span>⚠️ <strong>Kingmaker Scenario:</strong> Neither Left nor Right bloc can reach 61 seats without TOP!</span>
+                    <span>⚠️ <strong>Kingmaker Scenario:</strong> Neither bloc can reach 61 without TOP!</span>
                 </div>
             </div>
 
@@ -503,7 +540,6 @@
             ];
             map.fitBounds(nzBounds);
 
-            // Domain-authenticated Stadia Maps tile layer
             L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
                 maxZoom: 20,
                 attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
@@ -629,7 +665,7 @@
         function zoomToSeat(electorateName) {
             const layer = electorateLayers[electorateName];
             if (layer) {
-                map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 11 });
+                map.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 11 });
                 layer.setStyle({ weight: 4, color: '#ffffff', fillOpacity: 0.9 });
                 layer.bringToFront();
                 setTimeout(() => {
