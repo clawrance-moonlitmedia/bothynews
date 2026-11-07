@@ -838,108 +838,120 @@
         }
 
         function updateLeaderboard() {
-    // 1. Compile Electorate Wins (All 71+ seats)
-    const electorateWinsMap = {};
-    Object.keys(PARTIES).forEach(p => { electorateWinsMap[p] = []; });
+            // 1. Compile Electorate Wins (All 71+ seats)
+            const electorateWinsMap = {};
+            Object.keys(PARTIES).forEach(p => { electorateWinsMap[p] = []; });
 
-    Object.keys(electionData).forEach(electorate => {
-        const item = electionData[electorate];
-        const party = item.leadingParty || "Undeclared";
-        if (electorateWinsMap[party]) {
-            electorateWinsMap[party].push(electorate);
-        }
-    });
+            Object.keys(electionData).forEach(electorate => {
+                const item = electionData[electorate];
+                const party = item.leadingParty || "Undeclared";
+                if (electorateWinsMap[party]) {
+                    electorateWinsMap[party].push(electorate);
+                }
+            });
 
-    // 2. Compute Proportional Entitlements (Sainte-Laguë out of 120 base seats)
-    const totalPartyVotes = Object.values(partyVoteData).reduce((acc, cur) => acc + (cur.votes || 0), 0);
-    const partyTotalSeats = {};
-    const partyListSeats = {};
-    const partyOverhang = {};
+            // 2. Compute Proportional Entitlements (Sainte-Laguë out of 120 base seats)
+            const totalPartyVotes = Object.values(partyVoteData).reduce((acc, cur) => acc + (cur.votes || 0), 0);
+            const partyTotalSeats = {};
+            const partyListSeats = {};
+            const partyOverhang = {};
 
-    Object.keys(PARTIES).forEach(party => {
-        const pVotes = partyVoteData[party] ? partyVoteData[party].votes : 0;
-        let entitlement = 0;
-        if (totalPartyVotes > 0) {
-            entitlement = Math.round((pVotes / totalPartyVotes) * 120);
-        }
-        const wonCount = (electorateWinsMap[party] || []).length;
-        
-        // If local wins exceed proportional entitlement, overhang occurs
-        const overhang = Math.max(0, wonCount - entitlement);
-        const listSeatsCount = Math.max(0, entitlement - wonCount);
-        
-        partyTotalSeats[party] = wonCount + listSeatsCount;
-        partyListSeats[party] = listSeatsCount;
-        partyOverhang[party] = overhang;
-    });
+            Object.keys(PARTIES).forEach(party => {
+                const pVotes = partyVoteData[party] ? partyVoteData[party].votes : 0;
+                let entitlement = 0;
+                if (totalPartyVotes > 0) {
+                    entitlement = Math.round((pVotes / totalPartyVotes) * 120);
+                }
+                const wonCount = (electorateWinsMap[party] || []).length;
+                
+                // If local wins exceed proportional entitlement, overhang occurs
+                const overhang = Math.max(0, wonCount - entitlement);
+                const listSeatsCount = Math.max(0, entitlement - wonCount);
+                
+                partyTotalSeats[party] = wonCount + listSeatsCount;
+                partyListSeats[party] = listSeatsCount;
+                partyOverhang[party] = overhang;
+            });
 
-    // 3. Calculate Bloc Totals for Progress Bar
-    let leftSeats = 0;
-    let rightSeats = 0;
-    let centerSeats = 0;
+            // 3. Calculate Total Parliament Seats and Dynamic Majority Threshold
+            let totalParliamentSeats = 0;
+            Object.keys(PARTIES).forEach(party => {
+                totalParliamentSeats += (partyTotalSeats[party] || 0);
+            });
+            totalParliamentSeats = Math.max(120, totalParliamentSeats);
 
-    Object.keys(PARTIES).forEach(party => {
-        const total = partyTotalSeats[party] || 0;
-        if (PARTIES[party].bloc === "left") leftSeats += total;
-        if (PARTIES[party].bloc === "right") rightSeats += total;
-        if (PARTIES[party].bloc === "center") centerSeats += total;
-    });
+            const majorityThreshold = Math.floor(totalParliamentSeats / 2) + 1;
+            const majorityPct = (majorityThreshold / totalParliamentSeats) * 100;
 
-    const progressBar = document.getElementById('bloc-progress-bar');
-    
-    let leftHtml = `<div class="bloc-left-container">`;
-    Object.keys(PARTIES).forEach(party => {
-        if (PARTIES[party].bloc === "left") {
-            const count = partyTotalSeats[party] || 0;
-            if (count > 0) {
-                const pct = (count / 120) * 100;
-                leftHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+            // 4. Calculate Bloc Totals for Progress Bar
+            let leftSeats = 0;
+            let rightSeats = 0;
+            let centerSeats = 0;
+
+            Object.keys(PARTIES).forEach(party => {
+                const total = partyTotalSeats[party] || 0;
+                if (PARTIES[party].bloc === "left") leftSeats += total;
+                if (PARTIES[party].bloc === "right") rightSeats += total;
+                if (PARTIES[party].bloc === "center") centerSeats += total;
+            });
+
+            const progressBar = document.getElementById('bloc-progress-bar');
+            
+            let leftHtml = `<div class="bloc-left-container">`;
+            Object.keys(PARTIES).forEach(party => {
+                if (PARTIES[party].bloc === "left") {
+                    const count = partyTotalSeats[party] || 0;
+                    if (count > 0) {
+                        const pct = (count / totalParliamentSeats) * 100;
+                        leftHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+                    }
+                }
+            });
+            leftHtml += `</div>`;
+
+            let centerHtml = `<div style="display: flex; height: 100%;">`;
+            Object.keys(PARTIES).forEach(party => {
+                if (PARTIES[party].bloc === "center") {
+                    const count = partyTotalSeats[party] || 0;
+                    if (count > 0) {
+                        const pct = (count / totalParliamentSeats) * 100;
+                        centerHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+                    }
+                }
+            });
+            centerHtml += `</div>`;
+
+            let rightHtml = `<div class="bloc-right-container">`;
+            Object.keys(PARTIES).forEach(party => {
+                if (PARTIES[party].bloc === "right") {
+                    const count = partyTotalSeats[party] || 0;
+                    if (count > 0) {
+                        const pct = (count / totalParliamentSeats) * 100;
+                        rightHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
+                    }
+                }
+            });
+            rightHtml += `</div>`;
+
+            progressBar.innerHTML = `
+                <div class="majority-line" style="left: ${majorityPct}%;"></div>
+                <div class="majority-tooltip" style="left: ${majorityPct}%;">${majorityThreshold}</div>
+                ${leftHtml}
+                ${centerHtml}
+                ${rightHtml}
+            `;
+
+            document.querySelector('.gov-progress-target').innerText = `Majority: ${majorityThreshold} Seats`;
+
+            const scenarioBox = document.getElementById('scenario-box');
+            if (leftSeats < majorityThreshold && rightSeats < majorityThreshold && (leftSeats + rightSeats) < totalParliamentSeats) {
+                scenarioBox.style.display = 'flex';
+            } else {
+                scenarioBox.style.display = 'none';
             }
-        }
-    });
-    leftHtml += `</div>`;
 
-    let centerHtml = `<div style="display: flex; height: 100%;">`;
-    Object.keys(PARTIES).forEach(party => {
-        if (PARTIES[party].bloc === "center") {
-            const count = partyTotalSeats[party] || 0;
-            if (count > 0) {
-                const pct = (count / 120) * 100;
-                centerHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
-            }
-        }
-    });
-    centerHtml += `</div>`;
-
-    let rightHtml = `<div class="bloc-right-container">`;
-    Object.keys(PARTIES).forEach(party => {
-        if (PARTIES[party].bloc === "right") {
-            const count = partyTotalSeats[party] || 0;
-            if (count > 0) {
-                const pct = (count / 120) * 100;
-                rightHtml += `<div class="bloc-bar-segment" style="width: ${pct}%; background-color: ${PARTIES[party].color};" title="${party}: ${count}">${count}</div>`;
-            }
-        }
-    });
-    rightHtml += `</div>`;
-
-    progressBar.innerHTML = `
-        <div class="majority-line"></div>
-        <div class="majority-tooltip">61</div>
-        ${leftHtml}
-        ${centerHtml}
-        ${rightHtml}
-    `;
-
-    const scenarioBox = document.getElementById('scenario-box');
-    if (leftSeats < 61 && rightSeats < 61 && (leftSeats + rightSeats) < 120) {
-        scenarioBox.style.display = 'flex';
-    } else {
-        scenarioBox.style.display = 'none';
-    }
-
-    // 4. Render Party Leaderboard Cards with Dropdown Menu (Electorate + List + Overhang)
-    const leaderboardContainer = document.getElementById('party-leaderboard');
+            // 5. Render Party Leaderboard Cards with Dropdown Menu (Electorate + List + Overhang)
+            const leaderboardContainer = document.getElementById('party-leaderboard');
             leaderboardContainer.innerHTML = '';
         
             const sortedParties = Object.keys(PARTIES).sort((a, b) => {
