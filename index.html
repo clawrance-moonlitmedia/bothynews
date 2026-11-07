@@ -143,7 +143,7 @@
 
         /* Sidebar Leaderboard */
         sidebar {
-            width: 380px;
+            width: 400px;
             background-color: var(--bg-panel);
             border-left: 1px solid var(--border-color);
             padding: 16px;
@@ -307,8 +307,14 @@
 
         .party-info {
             display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .party-title-row {
+            display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .party-name {
@@ -318,9 +324,9 @@
         }
 
         .party-badge {
-            font-size: 0.6rem;
-            padding: 2px 5px;
-            border-radius: 4px;
+            font-size: 0.58rem;
+            padding: 1px 4px;
+            border-radius: 3px;
             font-family: var(--font-mono);
             font-weight: 700;
             text-transform: uppercase;
@@ -329,11 +335,33 @@
         .badge-right { background-color: rgba(0, 82, 159, 0.2); color: #60a5fa; }
         .badge-left { background-color: rgba(216, 42, 32, 0.2); color: #f87171; }
         .badge-center { background-color: rgba(147, 51, 234, 0.2); color: #c084fc; }
+        .badge-none { background-color: rgba(113, 113, 122, 0.2); color: #a1a1aa; }
 
-        .party-seats {
+        .party-stats-right {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .party-seats-val {
             font-family: var(--font-mono);
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             font-weight: 700;
+            line-height: 1;
+        }
+
+        .party-seats-label {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .party-votes-sub {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-top: 2px;
         }
 
         .seat-dropdown {
@@ -345,7 +373,7 @@
         }
 
         .party-card-wrapper.expanded .seat-dropdown {
-            max-height: 200px;
+            max-height: 220px;
             border-top: 1px solid var(--border-color);
         }
 
@@ -364,6 +392,12 @@
         .seat-item:hover {
             background-color: rgba(59, 130, 246, 0.1);
             color: #ffffff;
+        }
+
+        .seat-item.empty-notice {
+            font-style: italic;
+            color: #71717a;
+            cursor: default;
         }
 
         .leaflet-tooltip-custom {
@@ -481,14 +515,19 @@
     <script>
         const PARTIES = {
             "National": { color: "#00529F", bloc: "right", badge: "Right" },
-            "ACT": { color: "#FDE047", bloc: "right", badge: "Right" },
-            "NZ First": { color: "#000000", bloc: "right", badge: "Right" },
             "Labour": { color: "#D82A20", bloc: "left", badge: "Left" },
             "Green": { color: "#098137", bloc: "left", badge: "Left" },
+            "ACT": { color: "#FDE047", bloc: "right", badge: "Right" },
+            "NZ First": { color: "#000000", bloc: "right", badge: "Right" },
             "Te Pāti Māori": { color: "#B2001A", bloc: "left", badge: "Left" },
             "The Opportunities Party (TOP)": { color: "#008751", bloc: "center", badge: "Center" },
-            "Independent": { color: "#71717a", bloc: "center", badge: "Center" },
-            "Undeclared": { color: "#27272a", bloc: "none", badge: "" }
+            "Aotearoa Legalise Cannabis Party": { color: "#15803d", bloc: "none", badge: "Other" },
+            "Animal Justice Party": { color: "#0d9488", bloc: "none", badge: "Other" },
+            "Freedoms NZ": { color: "#c026d3", bloc: "none", badge: "Other" },
+            "New Zealand Loyal": { color: "#b91c1c", bloc: "none", badge: "Other" },
+            "NewZeal": { color: "#4338ca", bloc: "none", badge: "Other" },
+            "Vision NZ": { color: "#7c3aed", bloc: "none", badge: "Other" },
+            "Independent": { color: "#71717a", bloc: "center", badge: "Center" }
         };
 
         const MAORI_ELECTORATES = new Set([
@@ -502,6 +541,7 @@
         let currentRoll = 'general';
         let electionData = {};
         let normalizedData = {};
+        let partyVoteData = {};
         let electorateLayers = {};
 
         function normalizeName(str) {
@@ -529,6 +569,12 @@
             if (name.includes("Māori") || name.includes("Maori")) return "Te Pāti Māori";
             if (name.includes("NZ First") || name.includes("New Zealand First")) return "NZ First";
             if (name.includes("Opportunities") || name.includes("TOP")) return "The Opportunities Party (TOP)";
+            if (name.includes("Cannabis")) return "Aotearoa Legalise Cannabis Party";
+            if (name.includes("Animal")) return "Animal Justice Party";
+            if (name.includes("Freedoms")) return "Freedoms NZ";
+            if (name.includes("Loyal")) return "New Zealand Loyal";
+            if (name.includes("NewZeal")) return "NewZeal";
+            if (name.includes("Vision")) return "Vision NZ";
             return "Independent";
         }
 
@@ -557,7 +603,6 @@
             await fetchData();
             await loadGeoJSON();
             
-            // Fix Leaflet sizing bug when rendering inside flex container on mobile load
             setTimeout(() => { map.invalidateSize(); }, 250);
         }
 
@@ -572,6 +617,7 @@
                         document.getElementById('vote-progress').innerText = `${rawData.statistics.percentageCounted}% Counted`;
                     }
 
+                    partyVoteData = rawData.partyVotes || {};
                     electionData = {};
                     normalizedData = {};
 
@@ -597,7 +643,7 @@
                 party = normalizedData[normalizeName(electorateName)];
             }
             party = party || "Undeclared";
-            return (PARTIES[party] ? PARTIES[party].color : PARTIES["Undeclared"].color);
+            return (PARTIES[party] ? PARTIES[party].color : "#27272a");
         }
 
         async function loadGeoJSON() {
@@ -701,13 +747,17 @@
             let rightSeats = 0;
             let centerSeats = 0;
 
+            // Initialize all parties with empty seats array
+            Object.keys(PARTIES).forEach(p => {
+                partySeatsMap[p] = [];
+            });
+
             Object.keys(electionData).forEach(electorate => {
                 if (isCurrentRollElectorate(electorate)) {
                     const party = electionData[electorate];
-                    if (!partySeatsMap[party]) {
-                        partySeatsMap[party] = [];
+                    if (partySeatsMap[party]) {
+                        partySeatsMap[party].push(electorate);
                     }
-                    partySeatsMap[party].push(electorate);
 
                     if (PARTIES[party]) {
                         if (PARTIES[party].bloc === "left") leftSeats++;
@@ -717,6 +767,7 @@
                 }
             });
 
+            // Update Government Formation Progress Bar
             const progressBar = document.getElementById('bloc-progress-bar');
             
             let leftHtml = `<div class="bloc-left-container">`;
@@ -773,15 +824,25 @@
             const container = document.getElementById('party-leaderboard');
             container.innerHTML = '';
 
-            Object.keys(PARTIES).forEach(party => {
-                if (party === "Undeclared") return;
+            // Sort parties by seat count first, then by party vote percentage
+            const sortedParties = Object.keys(PARTIES).sort((a, b) => {
+                const seatsA = (partySeatsMap[a] || []).length;
+                const seatsB = (partySeatsMap[b] || []).length;
+                if (seatsB !== seatsA) return seatsB - seatsA;
+
+                const votesA = (partyVoteData[a] ? partyVoteData[a].percent : 0);
+                const votesB = (partyVoteData[b] ? partyVoteData[b].percent : 0);
+                return votesB - votesA;
+            });
+
+            sortedParties.forEach(party => {
                 const seatsList = partySeatsMap[party] || [];
                 const seatCount = seatsList.length;
-                
-                if (seatCount === 0) return;
                 seatsList.sort();
 
                 const partyMeta = PARTIES[party];
+                const pv = partyVoteData[party] || { votes: 0, percent: 0.0 };
+
                 const wrapper = document.createElement('div');
                 wrapper.className = 'party-card-wrapper';
 
@@ -790,28 +851,46 @@
                 card.style.borderLeftColor = partyMeta.color;
                 card.onclick = () => togglePartyAccordion(wrapper);
 
+                const votesFormatted = (pv.votes || 0).toLocaleString();
+                const percentFormatted = (pv.percent || 0.0).toFixed(1);
+
                 card.innerHTML = `
                     <div class="party-info">
-                        <span class="party-name">${party}</span>
-                        <span class="party-badge badge-${partyMeta.bloc}">${partyMeta.badge}</span>
+                        <div class="party-title-row">
+                            <span class="party-name">${party}</span>
+                            <span class="party-badge badge-${partyMeta.bloc}">${partyMeta.badge}</span>
+                        </div>
+                        <div class="party-votes-sub">
+                            ${percentFormatted}% &bull; ${votesFormatted} votes
+                        </div>
                     </div>
-                    <span class="party-seats" style="color: ${partyMeta.color}">${seatCount}</span>
+                    <div class="party-stats-right">
+                        <span class="party-seats-val" style="color: ${seatCount > 0 ? partyMeta.color : '#71717a'}">${seatCount}</span>
+                        <span class="party-seats-label">seats</span>
+                    </div>
                 `;
                 wrapper.appendChild(card);
 
                 const dropdown = document.createElement('div');
                 dropdown.className = 'seat-dropdown';
 
-                seatsList.forEach(seat => {
-                    const seatItem = document.createElement('div');
-                    seatItem.className = 'seat-item';
-                    seatItem.innerText = seat;
-                    seatItem.onclick = (e) => {
-                        e.stopPropagation();
-                        zoomToSeat(seat);
-                    };
-                    dropdown.appendChild(seatItem);
-                });
+                if (seatCount > 0) {
+                    seatsList.forEach(seat => {
+                        const seatItem = document.createElement('div');
+                        seatItem.className = 'seat-item';
+                        seatItem.innerText = seat;
+                        seatItem.onclick = (e) => {
+                            e.stopPropagation();
+                            zoomToSeat(seat);
+                        };
+                        dropdown.appendChild(seatItem);
+                    });
+                } else {
+                    const emptyNotice = document.createElement('div');
+                    emptyNotice.className = 'seat-item empty-notice';
+                    emptyNotice.innerText = 'No electorate seats won';
+                    dropdown.appendChild(emptyNotice);
+                }
 
                 wrapper.appendChild(dropdown);
                 container.appendChild(wrapper);
