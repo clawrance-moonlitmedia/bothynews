@@ -504,7 +504,7 @@
             ];
             map.fitBounds(nzBounds);
 
-            L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=693bbd69-e717-4fba-8e27-6cc198f22b78', {
+            L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
                 maxZoom: 20,
                 attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
             }).addTo(map);
@@ -538,10 +538,8 @@
                         normalizedData[normalizeName(key)] = party;
                     });
                 }
-
-                
             } catch (err) {
-                console.warn("Could not load data.json:", err);
+                console.warn("Could not load election results:", err);
             }
         }
 
@@ -555,22 +553,18 @@
         }
 
         async function loadGeoJSON() {
-            const fname = currentRoll === 'general' 
+            const filename = currentRoll === 'general' 
                 ? 'general-electorates.geojson' 
                 : 'maori-electorates.geojson';
 
-            const res = await fetch(`https://api.bothynews.co.nz/api/${fname}`);
             if (geojsonLayer) {
                 map.removeLayer(geojsonLayer);
             }
 
             electorateLayers = {};
-            const filename = currentRoll === 'general' 
-                ? 'general-electorates.geojson' 
-                : 'maori-electorates.geojson';
 
             try {
-                const res = await fetch(`/${filename}`);
+                const res = await fetch(`https://api.bothynews.co.nz/api/${filename}`);
                 if (!res.ok) {
                     console.error(`HTTP error fetching ${filename}: ${res.status}`);
                     return;
@@ -618,7 +612,6 @@
                     }
                 }).addTo(map);
 
-                // NOTE: Removed automatic fitBounds override here to keep the map locked over NZ.
                 updateLeaderboard();
             } catch (err) {
                 console.error(`Failed to load ${filename}:`, err);
